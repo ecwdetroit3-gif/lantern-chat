@@ -208,6 +208,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .setup-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .lock-card button.ghost { background: none; color: var(--ink); border: 1px solid var(--line); font-weight: 500; }
 .lock-card button.ghost.danger { color: var(--danger); margin-right: auto; }
+.test-row { display: flex; gap: 8px; }
+.test-row input { flex: 1; min-width: 0; }
+.lock-card .test-row button { flex: none; padding: 10px 14px; }
+.help { font-weight: 400; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.test-status { font-weight: 400; font-size: 13px; padding: 8px 10px; border-radius: 8px; background: var(--sunk); }
+.test-status.bad { color: var(--danger); }
 .link-btn { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; font-size: 12px; }
 
 @media (max-width: 760px) {
@@ -288,8 +294,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 <div class="lock" id="lock" hidden>
   <form class="lock-card" id="setupForm" autocomplete="off">
     <h1>Connect your AI</h1>
-    <p>Paste an API key from any AI company. Lantern saves it in this browser only and sends it only to that company.</p>
-    <label class="field"><span>API key</span>
+    <p>Paste an API key from any AI company, or connect to an AI running on your own computer or server. Lantern saves your settings in this browser only.</p>
+    <label class="field"><span id="keyLabel">API key</span>
       <input id="setKey" type="password" placeholder="sk-ant-…, AIza…, sk-…, gsk_…" spellcheck="false">
     </label>
     <label class="field"><span>AI company</span>
@@ -300,18 +306,25 @@ button { font: inherit; color: inherit; cursor: pointer; }
         <option value="openai">OpenAI (GPT)</option>
         <option value="groq">Groq</option>
         <option value="openrouter">OpenRouter</option>
-        <option value="custom">Other (OpenAI-compatible)</option>
+        <option value="custom">My own server or another service</option>
       </select>
     </label>
-    <label class="field" id="baseField" hidden><span>API address</span>
-      <input id="setBase" type="url" placeholder="https://api.deepseek.com/v1" spellcheck="false">
-    </label>
-    <label class="field"><span>Model <em>optional</em></span>
-      <input id="setModel" type="text" placeholder="Leave blank for the defaults" spellcheck="false">
+    <div class="field" id="baseField" hidden>
+      <label for="setBase">API address</label>
+      <div class="test-row">
+        <input id="setBase" type="url" placeholder="https://my-pc.tail1234.ts.net/v1" spellcheck="false">
+        <button type="button" class="ghost" id="setTest">Test</button>
+      </div>
+      <small class="help">The address of your server's OpenAI-compatible API, ending in /v1. From this website it must start with https:// unless the server runs on this same computer (localhost).</small>
+      <div class="test-status" id="testStatus" hidden></div>
+    </div>
+    <label class="field"><span>Model <em id="modelHint">optional</em></span>
+      <input id="setModel" type="text" list="modelList" placeholder="Leave blank for the defaults" spellcheck="false">
+      <datalist id="modelList"></datalist>
     </label>
     <div class="err" id="setErr" hidden></div>
     <div class="setup-actions">
-      <button type="button" class="ghost danger" id="setForget" hidden>Remove key</button>
+      <button type="button" class="ghost danger" id="setForget" hidden>Remove settings</button>
       <button type="button" class="ghost" id="setCancel" hidden>Cancel</button>
       <button type="submit">Save and start</button>
     </div>
@@ -369,16 +382,61 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
   // Turns saved settings into a ready-to-use connection, or an error message.
   function buildCfg(saved) {
-    if (!saved || !saved.key) return { error: "Paste an API key to get started." };
-    const id = saved.provider === "auto" || !saved.provider ? detect(saved.key) : saved.provider;
+    if (!saved) return { error: "Paste an API key to get started." };
+    const id = saved.provider === "auto" || !saved.provider ? detect(saved.key || "") : saved.provider;
+    if (!saved.key && id !== "custom") return { error: "Paste an API key to get started." };
     if (!id) return { error: "Lantern couldn't tell which company this key is from. Choose it under AI company." };
     const p = PROVIDERS[id];
     const base = (id === "custom" ? (saved.base || "") : p.base).replace(/\/+$/, "");
-    if (id === "custom" && !/^https?:\/\//.test(base)) return { error: "Enter the service's API address, like https://api.deepseek.com/v1." };
+    if (id === "custom" && !/^https?:\/\//.test(base)) return { error: "Enter your server's API address, like https://my-pc.tail1234.ts.net/v1." };
+    if (id === "custom") { const why = blockedReason(base); if (why) return { error: why }; }
     const m = (saved.model || "").trim();
     const models = { quick: m || p.models.quick, default: m || p.models.default, complex: m || p.models.complex };
     if (!models.default) return { error: "Enter the model name to use for this service." };
-    return { id, key: saved.key, base, models, name: p.name, label: p.label };
+    return { id, key: saved.key || "", base, models, name: p.name, label: p.label };
+  }
+
+  // Browsers block https pages from calling plain-http addresses, except this computer itself.
+  function blockedReason(base) {
+    let u; try { u = new URL(base); } catch (e) { return "That API address isn't a valid web address."; }
+    const local = ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname) || u.hostname.endsWith(".localhost");
+    if (location.protocol === "https:" && u.protocol === "http:" && !local) {
+      return "Browsers block this website from using plain http:// addresses on other computers. Give your server an https:// address (Tailscale or a Cloudflare Tunnel can do this), or open Lantern from the index.html file instead.";
+    }
+    return null;
+  }
+  function authHeaders(key) { return key ? { authorization: "Bearer " + key } : {}; }
+
+  async function testConnection() {
+    const st = $("testStatus");
+    const base = $("setBase").value.trim().replace(/\/+$/, "");
+    const key = $("setKey").value.trim();
+    st.hidden = false; st.className = "test-status"; st.textContent = "Connecting…";
+    const bad = (msg) => { st.className = "test-status bad"; st.textContent = msg; };
+    if (!/^https?:\/\//.test(base)) return bad("Enter an address starting with https:// first.");
+    const why = blockedReason(base); if (why) return bad(why);
+    const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 10000);
+    try {
+      const res = await fetch(base + "/models", { headers: authHeaders(key), signal: ctl.signal });
+      if (res.status === 401 || res.status === 403) return bad("The server is reachable but refused the key. Check the API key.");
+      if (!res.ok) return bad("The server answered with error " + res.status + ". Check that the address ends in /v1.");
+      const j = await res.json().catch(() => ({}));
+      const ids = (Array.isArray(j.data) ? j.data : []).map(m => m && m.id).filter(Boolean);
+      const list = $("modelList"); list.innerHTML = "";
+      ids.forEach(id => { const o = document.createElement("option"); o.value = id; list.appendChild(o); });
+      if (ids.length && !$("setModel").value.trim()) $("setModel").value = ids[0];
+      st.textContent = ids.length ? "Connected. Found " + ids.length + " model" + (ids.length === 1 ? "" : "s") + ": " + ids.slice(0, 6).join(", ") + (ids.length > 6 ? "…" : "") : "Connected, but the server didn't list any models. Type the model name below.";
+    } catch (e) {
+      bad(e && e.name === "AbortError" ? "No answer after 10 seconds. Check that the server is running and the address is right." : "Couldn't connect. Check that the server is running, the address is right, and the server allows this website (for Ollama, set OLLAMA_ORIGINS).");
+    } finally { clearTimeout(timer); }
+  }
+
+  function syncSetupFields() {
+    const custom = $("setProvider").value === "custom";
+    $("baseField").hidden = !custom;
+    $("keyLabel").innerHTML = custom ? 'API key <em>optional</em>' : 'API key';
+    $("modelHint").textContent = custom ? "required" : "optional";
+    $("setModel").placeholder = custom ? "For example llama3.2" : "Leave blank for the defaults";
   }
 
   function loadSaved() { try { return JSON.parse(localStorage.getItem("lantern.ai") || "null"); } catch (e) { return null; } }
@@ -396,19 +454,21 @@ button { font: inherit; color: inherit; cursor: pointer; }
     $("setProvider").value = saved.provider || "auto";
     $("setBase").value = saved.base || "";
     $("setModel").value = saved.model || "";
-    $("baseField").hidden = $("setProvider").value !== "custom";
+    syncSetupFields(); $("testStatus").hidden = true;
     $("setCancel").hidden = !state.cfg;
-    $("setForget").hidden = !saved.key;
+    $("setForget").hidden = !(saved.key || saved.base);
     setErr.hidden = !message; setErr.textContent = message || "";
     lock.hidden = false; closeNav();
     $("setKey").focus();
   }
-  $("setProvider").addEventListener("change", () => { $("baseField").hidden = $("setProvider").value !== "custom"; });
+  $("setProvider").addEventListener("change", syncSetupFields);
+  $("setTest").onclick = testConnection;
   $("setCancel").onclick = () => { lock.hidden = true; input.focus(); };
   $("setForget").onclick = () => {
     try { localStorage.removeItem("lantern.ai"); } catch (e) {}
+    $("setBase").value = ""; $("setModel").value = "";
     state.cfg = null; $("storageNote").textContent = "Not connected yet.";
-    openSettings("Key removed from this browser.");
+    openSettings("Your settings were removed from this browser.");
     $("setForget").hidden = true; $("setCancel").hidden = true;
   };
   $("openSettings").onclick = () => openSettings();
@@ -441,7 +501,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
         })
       });
     }
-    const headers = { "content-type": "application/json", authorization: "Bearer " + cfg.key };
+    const headers = { "content-type": "application/json", ...authHeaders(cfg.key) };
     if (cfg.id === "openrouter") headers["x-title"] = "Lantern";
     return fetch(cfg.base + "/chat/completions", {
       method: "POST", signal, headers,
@@ -711,7 +771,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     try { res = await callAI(cfg, model, turns, signal); }
     catch (e) {
       if (e && e.name === "AbortError") throw e;
-      throw new Error(cfg.id === "custom" ? "Couldn't reach that API address. Check it in AI settings, and make sure the service allows use from a browser." : "Couldn't reach " + cfg.label + ". Check your internet connection and try again.");
+      throw new Error(cfg.id === "custom" ? "Couldn't reach your server. Check that it's running and the address is right, then use Test in AI settings." : "Couldn't reach " + cfg.label + ". Check your internet connection and try again.");
     }
     // If the chosen model isn't available (say, a paid model on a free plan), use the Balanced one.
     if (!res.ok && model !== cfg.models.default && [400, 403, 404, 429].includes(res.status)) {
