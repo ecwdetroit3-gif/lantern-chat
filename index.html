@@ -312,10 +312,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     <div class="field" id="baseField" hidden>
       <label for="setBase">API address</label>
       <div class="test-row">
-        <input id="setBase" type="url" placeholder="https://my-pc.tail1234.ts.net/v1" spellcheck="false">
+        <input id="setBase" type="text" inputmode="url" autocapitalize="off" placeholder="192.168.1.5 or https://my-pc.example/v1" spellcheck="false">
         <button type="button" class="ghost" id="setTest">Test</button>
       </div>
-      <small class="help">The address of your server's OpenAI-compatible API, ending in /v1. From this website it must start with https:// unless the server runs on this same computer (localhost).</small>
+      <small class="help">Type your server's IP address, like 192.168.1.5, or a full address. Lantern fills in the rest (Ollama's port 11434 and /v1). Local IP addresses work in Chrome and Edge, which will ask you to allow access to your local network.</small>
       <div class="test-status" id="testStatus" hidden></div>
     </div>
     <label class="field"><span>Model <em id="modelHint">optional</em></span>
@@ -387,8 +387,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     if (!saved.key && id !== "custom") return { error: "Paste an API key to get started." };
     if (!id) return { error: "Lantern couldn't tell which company this key is from. Choose it under AI company." };
     const p = PROVIDERS[id];
-    const base = (id === "custom" ? (saved.base || "") : p.base).replace(/\/+$/, "");
-    if (id === "custom" && !/^https?:\/\//.test(base)) return { error: "Enter your server's API address, like https://my-pc.tail1234.ts.net/v1." };
+    const base = id === "custom" ? normalizeBase(saved.base) : p.base.replace(/\/+$/, "");
+    if (id === "custom" && !/^https?:\/\//.test(base)) return { error: "Enter your server's address, like 192.168.1.5." };
     if (id === "custom") { const why = blockedReason(base); if (why) return { error: why }; }
     const m = (saved.model || "").trim();
     const models = { quick: m || p.models.quick, default: m || p.models.default, complex: m || p.models.complex };
@@ -396,28 +396,69 @@ button { font: inherit; color: inherit; cursor: pointer; }
     return { id, key: saved.key || "", base, models, name: p.name, label: p.label };
   }
 
-  // Browsers block https pages from calling plain-http addresses, except this computer itself.
+  // ---------- server addresses ----------
+  // Is this host on the local network (this computer, home network, Tailscale, .local)?
+  function isLocalHost(host) {
+    host = host.replace(/^\[|\]$/g, "").toLowerCase();
+    if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return true;
+    const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (m) {
+      const [x, y] = [+m[1], +m[2]];
+      return x === 10 || x === 127 || (x === 172 && y >= 16 && y <= 31) || (x === 192 && y === 168) ||
+             (x === 169 && y === 254) || (x === 100 && y >= 64 && y <= 127);
+    }
+    return host === "::1" || /^f[cd][0-9a-f]{2}:/.test(host) || /^fe80:/.test(host);
+  }
+  const isIPv4 = (h) => /^\d{1,3}(\.\d{1,3}){3}$/.test(h);
+
+  // Turns "192.168.1.5" into "http://192.168.1.5:11434/v1", and tidies full addresses.
+  function normalizeBase(input) {
+    let t = (input || "").trim().replace(/\/+$/, "");
+    if (!t) return "";
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) {
+      const host = t.split(/[\/:]/)[0];
+      t = (isLocalHost(host) || isIPv4(host) ? "http://" : "https://") + t;
+    }
+    let u; try { u = new URL(t); } catch (e) { return t; }
+    if (u.protocol === "http:" && !u.port && (isIPv4(u.hostname) || isLocalHost(u.hostname))) u.port = "11434";
+    if (u.pathname === "/" || u.pathname === "") u.pathname = "/v1";
+    return u.toString().replace(/\/+$/, "");
+  }
+
+  // Extra fetch option so Chrome treats requests to local IPs as local-network requests.
+  function netOpts(base) {
+    try { const u = new URL(base); return u.protocol === "http:" && isLocalHost(u.hostname) ? { targetAddressSpace: "local" } : {}; }
+    catch (e) { return {}; }
+  }
+  function isLocalHttp(base) { return !!netOpts(base).targetAddressSpace; }
+
+  // Only one case can never work from this https website: plain http to a public internet address.
   function blockedReason(base) {
-    let u; try { u = new URL(base); } catch (e) { return "That API address isn't a valid web address."; }
-    const local = ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname) || u.hostname.endsWith(".localhost");
-    if (location.protocol === "https:" && u.protocol === "http:" && !local) {
-      return "Browsers block this website from using plain http:// addresses on other computers. Give your server an https:// address (Tailscale or a Cloudflare Tunnel can do this), or open Lantern from the index.html file instead.";
+    let u; try { u = new URL(base); } catch (e) { return "That address doesn't look right. Try something like 192.168.1.5."; }
+    if (location.protocol === "https:" && u.protocol === "http:" && !isLocalHost(u.hostname)) {
+      return "Browsers block this website from using http:// addresses on the public internet. Use your PC's local IP address (like 192.168.1.5) on the same Wi-Fi, or an https:// address from Tailscale.";
     }
     return null;
+  }
+  function connectHelp(base) {
+    return isLocalHttp(base) && location.protocol === "https:"
+      ? "Couldn't connect. Check that: Ollama is running with OLLAMA_HOST set to 0.0.0.0 and OLLAMA_ORIGINS set to this website; Windows Firewall allows port 11434; and you chose Allow if your browser asked about your local network. Local IP addresses only work in Chrome and Edge (not Safari, Firefox, or iPhone browsers)."
+      : "Couldn't connect. Check that the server is running, the address is right, and the server allows this website (for Ollama, set OLLAMA_ORIGINS).";
   }
   function authHeaders(key) { return key ? { authorization: "Bearer " + key } : {}; }
 
   async function testConnection() {
     const st = $("testStatus");
-    const base = $("setBase").value.trim().replace(/\/+$/, "");
+    const base = normalizeBase($("setBase").value);
+    if (base) $("setBase").value = base;
     const key = $("setKey").value.trim();
     st.hidden = false; st.className = "test-status"; st.textContent = "Connecting…";
     const bad = (msg) => { st.className = "test-status bad"; st.textContent = msg; };
-    if (!/^https?:\/\//.test(base)) return bad("Enter an address starting with https:// first.");
+    if (!/^https?:\/\//.test(base)) return bad("Enter your server's address first, like 192.168.1.5.");
     const why = blockedReason(base); if (why) return bad(why);
     const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 10000);
     try {
-      const res = await fetch(base + "/models", { headers: authHeaders(key), signal: ctl.signal });
+      const res = await fetch(base + "/models", { headers: authHeaders(key), signal: ctl.signal, ...netOpts(base) });
       if (res.status === 401 || res.status === 403) return bad("The server is reachable but refused the key. Check the API key.");
       if (!res.ok) return bad("The server answered with error " + res.status + ". Check that the address ends in /v1.");
       const j = await res.json().catch(() => ({}));
@@ -427,7 +468,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       if (ids.length && !$("setModel").value.trim()) $("setModel").value = ids[0];
       st.textContent = ids.length ? "Connected. Found " + ids.length + " model" + (ids.length === 1 ? "" : "s") + ": " + ids.slice(0, 6).join(", ") + (ids.length > 6 ? "…" : "") : "Connected, but the server didn't list any models. Type the model name below.";
     } catch (e) {
-      bad(e && e.name === "AbortError" ? "No answer after 10 seconds. Check that the server is running and the address is right." : "Couldn't connect. Check that the server is running, the address is right, and the server allows this website (for Ollama, set OLLAMA_ORIGINS).");
+      bad(e && e.name === "AbortError" ? "No answer after 10 seconds. Check that the PC is on, the server is running, and the address is right." : connectHelp(base));
     } finally { clearTimeout(timer); }
   }
 
@@ -463,6 +504,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   $("setProvider").addEventListener("change", syncSetupFields);
   $("setTest").onclick = testConnection;
+  $("setBase").addEventListener("blur", () => { const v = normalizeBase($("setBase").value); if (v) $("setBase").value = v; });
   $("setCancel").onclick = () => { lock.hidden = true; input.focus(); };
   $("setForget").onclick = () => {
     try { localStorage.removeItem("lantern.ai"); } catch (e) {}
@@ -474,7 +516,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   $("openSettings").onclick = () => openSettings();
   setupForm.addEventListener("submit", (e) => {
     e.preventDefault();
-    const saved = { key: $("setKey").value.trim(), provider: $("setProvider").value, base: $("setBase").value.trim(), model: $("setModel").value.trim() };
+    const saved = { key: $("setKey").value.trim(), provider: $("setProvider").value, base: normalizeBase($("setBase").value), model: $("setModel").value.trim() };
+    if (saved.base) $("setBase").value = saved.base;
     const cfg = buildCfg(saved);
     if (cfg.error) { setErr.textContent = cfg.error; setErr.hidden = false; return; }
     try { localStorage.setItem("lantern.ai", JSON.stringify(saved)); } catch (e2) {}
@@ -504,7 +547,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const headers = { "content-type": "application/json", ...authHeaders(cfg.key) };
     if (cfg.id === "openrouter") headers["x-title"] = "Lantern";
     return fetch(cfg.base + "/chat/completions", {
-      method: "POST", signal, headers,
+      method: "POST", signal, headers, ...netOpts(cfg.base),
       body: JSON.stringify({ model, stream: true, messages: [{ role: "system", content: SYSTEM }, ...messages] })
     });
   }
@@ -771,7 +814,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     try { res = await callAI(cfg, model, turns, signal); }
     catch (e) {
       if (e && e.name === "AbortError") throw e;
-      throw new Error(cfg.id === "custom" ? "Couldn't reach your server. Check that it's running and the address is right, then use Test in AI settings." : "Couldn't reach " + cfg.label + ". Check your internet connection and try again.");
+      throw new Error(cfg.id === "custom" ? connectHelp(cfg.base) : "Couldn't reach " + cfg.label + ". Check your internet connection and try again.");
     }
     // If the chosen model isn't available (say, a paid model on a free plan), use the Balanced one.
     if (!res.ok && model !== cfg.models.default && [400, 403, 404, 429].includes(res.status)) {
