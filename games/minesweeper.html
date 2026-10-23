@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Minesweeper · Lantern</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+<link rel="stylesheet" href="shell.css">
+<style>
+.stage { container-type: size; overflow: auto; }
+.grid {
+  --cols: 9; --rows: 9;
+  --cell: min(40px, calc((100cqw - 12px) / var(--cols)), calc((100cqh - 12px) / var(--rows)));
+  display: grid; grid-template-columns: repeat(var(--cols), var(--cell)); gap: 0;
+  padding: 6px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow);
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.grid button {
+  width: var(--cell); height: var(--cell); padding: 0; border: 0; border-radius: 0;
+  font-family: var(--f-display); font-weight: 700; font-size: calc(var(--cell) * .52); line-height: 1;
+  display: flex; align-items: center; justify-content: center; touch-action: manipulation;
+  background: var(--line); box-shadow: inset 0 0 0 1px var(--surface); border-radius: 5px;
+}
+.grid button:hover:not(.open) { background: color-mix(in srgb, var(--accent) 22%, var(--line)); }
+.grid button.open { background: var(--surface); box-shadow: inset 0 0 0 .5px var(--line); border-radius: 0; cursor: default; }
+.grid button.boom { background: var(--danger); color: var(--surface); }
+.grid button svg { width: 58%; height: 58%; }
+.n1 { color: #3A72C9; } .n2 { color: #3E8E5A; } .n3 { color: #C9473A; } .n4 { color: #6A4BB0; }
+.n5 { color: #A0522D; } .n6 { color: #2A8C8C; } .n7 { color: var(--ink); } .n8 { color: var(--muted); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .n1 { color: #7FA8F0; } :root:not([data-theme="light"]) .n2 { color: #74C48F; }
+  :root:not([data-theme="light"]) .n3 { color: #F08A73; } :root:not([data-theme="light"]) .n4 { color: #B49AF0; }
+  :root:not([data-theme="light"]) .n5 { color: #E0A070; } :root:not([data-theme="light"]) .n6 { color: #6FD0D0; }
+}
+.flag-toggle[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+@media (max-width: 560px) {
+  .game-top { flex-wrap: wrap; }
+  .game-top .seg { order: 5; width: 100%; }
+  .game-top .seg button { flex: 1; }
+}
+</style>
+</head>
+<body>
+<header class="game-top">
+  <a class="icon-btn" href="../" aria-label="All games" title="All games"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M11 4 6 9l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+  <h1 class="hide-sm">Minesweeper</h1>
+  <div class="seg" role="group" aria-label="Difficulty">
+    <button type="button" data-level="easy" aria-pressed="true">Easy</button>
+    <button type="button" data-level="medium" aria-pressed="false">Medium</button>
+    <button type="button" data-level="hard" aria-pressed="false">Hard</button>
+  </div>
+  <div class="stats">
+    <div class="stat"><span>Mines</span><b id="mines">10</b></div>
+    <div class="stat"><span>Time</span><b id="time">0</b></div>
+  </div>
+  <button class="icon-btn flag-toggle" id="flagMode" type="button" aria-pressed="false" aria-label="Flag mode" title="Flag mode: taps place flags"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M5 16V2.5M5 3h8l-2 3 2 3H5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  <button class="icon-btn" id="restart" type="button" aria-label="New game" title="New game (R)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M14.5 9a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+</header>
+<main class="stage"><div class="grid" id="grid" role="grid" aria-label="Minefield"></div></main>
+<p class="help">Click to dig, right-click to flag. Click a number whose flags are all placed to dig its neighbors. On touch screens, long-press or use the flag button. Best: <b id="best">—</b></p>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const LEVELS = { easy: [9, 9, 10], medium: [16, 16, 40], hard: [16, 30, 99] };
+  const FLAG = '<svg viewBox="0 0 18 18" aria-hidden="true"><path d="M5 16V2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M5 3h8l-2 3 2 3H5z" fill="var(--accent)"/></svg>';
+  const MINE = '<svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="4.6" fill="currentColor"/><path d="M9 1.5v15M1.5 9h15M3.7 3.7l10.6 10.6M14.3 3.7 3.7 14.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  const gridEl = document.getElementById('grid');
+  const minesEl = document.getElementById('mines');
+  const timeEl = document.getElementById('time');
+  const bestEl = document.getElementById('best');
+  const flagBtn = document.getElementById('flagMode');
+
+  let level = Shell.get('minesweeper.level', 'easy');
+  if (!LEVELS[level]) level = 'easy';
+  let rows, cols, mines, cells, started, over, flags, opened, timer, startTime, flagMode = false;
+
+  function idx(r, c) { return r * cols + c; }
+  function neighbors(i) {
+    const r = Math.floor(i / cols), c = i % cols, out = [];
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (!dr && !dc) continue;
+      const nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nc >= 0 && nr < rows && nc < cols) out.push(idx(nr, nc));
+    }
+    return out;
+  }
+
+  function showBest() {
+    const b = Shell.get('minesweeper.best.' + level, null);
+    bestEl.textContent = b == null ? '—' : b + 's on ' + level;
+  }
+
+  function newGame() {
+    [rows, cols, mines] = LEVELS[level];
+    // Hard is wide; turn it sideways on tall, narrow screens.
+    if (level === 'hard' && window.innerHeight > window.innerWidth) [rows, cols] = [cols, rows];
+    cells = Array.from({ length: rows * cols }, () => ({ mine: false, n: 0, open: false, flag: false }));
+    started = false; over = false; flags = 0; opened = 0;
+    clearInterval(timer); timeEl.textContent = '0';
+    minesEl.textContent = mines;
+    gridEl.style.setProperty('--cols', cols);
+    gridEl.style.setProperty('--rows', rows);
+    gridEl.textContent = '';
+    const frag = document.createDocumentFragment();
+    cells.forEach((_, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.i = i;
+      b.setAttribute('aria-label', 'Hidden');
+      frag.appendChild(b);
+    });
+    gridEl.appendChild(frag);
+    document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.level === level)));
+    Shell.hideOverlay();
+    showBest();
+  }
+
+  // Mines are placed after the first click so it never hits one and always opens an area.
+  function layMines(safe) {
+    const banned = new Set([safe, ...neighbors(safe)]);
+    const pool = [];
+    for (let i = 0; i < cells.length; i++) if (!banned.has(i)) pool.push(i);
+    for (let k = 0; k < mines; k++) {
+      const j = k + Math.floor(Math.random() * (pool.length - k));
+      [pool[k], pool[j]] = [pool[j], pool[k]];
+      cells[pool[k]].mine = true;
+    }
+    cells.forEach((cell, i) => { cell.n = neighbors(i).filter((n) => cells[n].mine).length; });
+    started = true;
+    startTime = performance.now();
+    timer = setInterval(() => { timeEl.textContent = Math.floor((performance.now() - startTime) / 1000); }, 250);
+  }
+
+  function paint(i) {
+    const cell = cells[i], b = gridEl.children[i];
+    b.className = '';
+    b.innerHTML = '';
+    if (cell.open) {
+      b.classList.add('open');
+      if (cell.mine) { b.innerHTML = MINE; b.setAttribute('aria-label', 'Mine'); }
+      else if (cell.n) { b.textContent = cell.n; b.classList.add('n' + cell.n); b.setAttribute('aria-label', cell.n + ' mines near'); }
+      else b.setAttribute('aria-label', 'Empty');
+    } else if (cell.flag) {
+      b.innerHTML = FLAG; b.setAttribute('aria-label', 'Flagged');
+    } else {
+      b.setAttribute('aria-label', 'Hidden');
+    }
+  }
+
+  function dig(i) {
+    const cell = cells[i];
+    if (over || cell.flag) return;
+    if (!started) layMines(i);
+    if (cell.open) return chord(i);
+    if (cell.mine) return lose(i);
+    const stack = [i];
+    while (stack.length) {
+      const j = stack.pop(), cj = cells[j];
+      if (cj.open || cj.flag) continue;
+      cj.open = true; opened++;
+      paint(j);
+      if (!cj.n) for (const n of neighbors(j)) if (!cells[n].open) stack.push(n);
+    }
+    if (opened === cells.length - mines) win();
+  }
+
+  function chord(i) {
+    const cell = cells[i];
+    if (!cell.n) return;
+    const around = neighbors(i);
+    if (around.filter((n) => cells[n].flag).length !== cell.n) return;
+    for (const n of around) {
+      if (over) return;
+      if (!cells[n].open && !cells[n].flag) dig(n);
+    }
+  }
+
+  function toggleFlag(i) {
+    const cell = cells[i];
+    if (over || cell.open) return;
+    cell.flag = !cell.flag;
+    flags += cell.flag ? 1 : -1;
+    minesEl.textContent = mines - flags;
+    paint(i);
+  }
+
+  function lose(i) {
+    over = true; clearInterval(timer);
+    cells.forEach((cell, j) => {
+      if (cell.mine && !cell.flag) { cell.open = true; paint(j); }
+    });
+    gridEl.children[i].classList.add('boom');
+    setTimeout(() => Shell.overlay('Boom', 'You hit a mine.', [
+      { label: 'Try again', primary: true, onClick: newGame },
+      { label: 'Look at the board', onClick: Shell.hideOverlay },
+    ]), 500);
+  }
+
+  function win() {
+    over = true; clearInterval(timer);
+    const secs = Math.max(1, Math.round((performance.now() - startTime) / 1000));
+    timeEl.textContent = secs;
+    cells.forEach((cell, j) => { if (cell.mine && !cell.flag) { cell.flag = true; paint(j); } });
+    minesEl.textContent = 0;
+    const { best, isNew } = Shell.best('minesweeper', secs, { lower: true, variant: level });
+    Shell.card('minesweeper', 'Best ' + best + 's on ' + level);
+    showBest();
+    Shell.overlay('Cleared', secs + ' seconds on ' + level + (isNew ? ' · new best' : ''), [
+      { label: 'Play again', primary: true, onClick: newGame },
+    ]);
+  }
+
+  // Input: click digs, right-click flags, long-press flags on touch.
+  let pressTimer = null, longPressed = false;
+  gridEl.addEventListener('pointerdown', (e) => {
+    const b = e.target.closest('button');
+    if (!b || e.pointerType === 'mouse') return;
+    longPressed = false;
+    pressTimer = setTimeout(() => {
+      longPressed = true;
+      toggleFlag(+b.dataset.i);
+      if (navigator.vibrate) navigator.vibrate(15);
+    }, 380);
+  });
+  const cancelPress = () => clearTimeout(pressTimer);
+  gridEl.addEventListener('pointerup', cancelPress);
+  gridEl.addEventListener('pointercancel', cancelPress);
+  gridEl.addEventListener('pointerleave', cancelPress);
+  gridEl.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (longPressed) { longPressed = false; return; }
+    const i = +b.dataset.i;
+    if (flagMode && !cells[i].open) toggleFlag(i); else dig(i);
+  });
+  gridEl.addEventListener('contextmenu', (e) => {
+    const b = e.target.closest('button');
+    e.preventDefault();
+    if (b && !longPressed) toggleFlag(+b.dataset.i);
+  });
+
+  flagBtn.addEventListener('click', () => {
+    flagMode = !flagMode;
+    flagBtn.setAttribute('aria-pressed', String(flagMode));
+  });
+  document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
+    level = b.dataset.level;
+    Shell.set('minesweeper.level', level);
+    newGame();
+  }));
+  document.getElementById('restart').addEventListener('click', newGame);
+  document.addEventListener('keydown', (e) => {
+    if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey) newGame();
+    if (e.key === 'f' || e.key === 'F') flagBtn.click();
+  });
+
+  newGame();
+})();
+</script>
+</body>
+</html>

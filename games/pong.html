@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pong · Lantern</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+<link rel="stylesheet" href="shell.css">
+</head>
+<body>
+<header class="game-top">
+  <a class="icon-btn" href="../" aria-label="All games" title="All games"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M11 4 6 9l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+  <h1>Pong</h1>
+  <div class="seg hide-sm" role="group" aria-label="Computer skill">
+    <button type="button" data-skill="easy" aria-pressed="false">Easy</button>
+    <button type="button" data-skill="normal" aria-pressed="true">Normal</button>
+    <button type="button" data-skill="hard" aria-pressed="false">Hard</button>
+  </div>
+  <div class="stats">
+    <div class="stat"><span>Wins</span><b id="wins">0</b></div>
+    <div class="stat"><span>Losses</span><b id="losses">0</b></div>
+  </div>
+  <button class="icon-btn" id="restart" type="button" aria-label="Restart" title="Restart (R)"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M14.5 9a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  <button class="icon-btn hide-sm" id="fullscreen" type="button" aria-label="Full screen" title="Full screen"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 7V3h4M15 7V3h-4M3 11v4h4M15 11v4h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+</header>
+<main class="stage" id="stage"><canvas id="board" aria-label="Pong court"></canvas></main>
+<p class="help"><span class="keys">Move the mouse or use <kbd>↑</kbd><kbd>↓</kbd> / <kbd>W</kbd><kbd>S</kbd> · <kbd>P</kbd> to pause · </span>Drag to move on touch screens. First to 7 wins.</p>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const W = 640, H = 400, PW = 12, PH = 72, PX = 24, R = 7, TO_WIN = 7;
+  const SKILL = { easy: { speed: 230, error: 46 }, normal: { speed: 330, error: 26 }, hard: { speed: 470, error: 10 } };
+  const canvas = document.getElementById('board');
+  const ctx = Shell.fit(canvas, W, H, draw);
+  const winsEl = document.getElementById('wins');
+  const lossesEl = document.getElementById('losses');
+
+  let skill = Shell.get('pong.skill', 'normal');
+  if (!SKILL[skill]) skill = 'normal';
+  let you, cpu, ball, scores, running, paused, last, serveIn, aimOffset, keys = { up: false, down: false };
+
+  function record() {
+    winsEl.textContent = Shell.get('pong.wins', 0);
+    lossesEl.textContent = Shell.get('pong.losses', 0);
+  }
+  record();
+
+  function serve(dir) {
+    ball = { x: W / 2, y: H / 2, vx: 0, vy: 0, speed: 300, dir };
+    serveIn = 0.8;
+  }
+
+  function newMatch() {
+    you = H / 2; cpu = H / 2; scores = [0, 0]; aimOffset = 0;
+    serve(Math.random() < 0.5 ? -1 : 1);
+    document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.skill === skill)));
+    draw();
+  }
+
+  function bounce(paddleY, dir) {
+    const hit = Math.max(-1, Math.min(1, (ball.y - paddleY) / (PH / 2)));
+    ball.speed = Math.min(780, ball.speed * 1.06);
+    const a = hit * 0.9;
+    ball.vx = Math.cos(a) * ball.speed * dir;
+    ball.vy = Math.sin(a) * ball.speed;
+    aimOffset = (Math.random() * 2 - 1) * SKILL[skill].error;
+  }
+
+  function step(dt) {
+    if (keys.up) you -= 420 * dt;
+    if (keys.down) you += 420 * dt;
+    you = Math.max(PH / 2, Math.min(H - PH / 2, you));
+
+    // The computer follows the ball with a top speed and a little aiming error.
+    const target = ball.vx > 0 ? ball.y + aimOffset : H / 2;
+    const s = SKILL[skill].speed * dt;
+    cpu += Math.max(-s, Math.min(s, target - cpu));
+    cpu = Math.max(PH / 2, Math.min(H - PH / 2, cpu));
+
+    if (serveIn > 0) {
+      serveIn -= dt;
+      if (serveIn <= 0) {
+        const a = Math.random() * 0.8 - 0.4;
+        ball.vx = Math.cos(a) * ball.speed * ball.dir;
+        ball.vy = Math.sin(a) * ball.speed;
+      }
+      return;
+    }
+
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
+    if (ball.y < R) { ball.y = R; ball.vy = Math.abs(ball.vy); }
+    if (ball.y > H - R) { ball.y = H - R; ball.vy = -Math.abs(ball.vy); }
+
+    if (ball.vx < 0 && ball.x - R <= PX + PW && ball.x - R >= PX - 10 && Math.abs(ball.y - you) <= PH / 2 + R) {
+      ball.x = PX + PW + R;
+      bounce(you, 1);
+    }
+    if (ball.vx > 0 && ball.x + R >= W - PX - PW && ball.x + R <= W - PX + 10 && Math.abs(ball.y - cpu) <= PH / 2 + R) {
+      ball.x = W - PX - PW - R;
+      bounce(cpu, -1);
+    }
+    if (ball.x < -R) point(1);
+    else if (ball.x > W + R) point(0);
+  }
+
+  function point(who) {
+    scores[who]++;
+    if (scores[who] >= TO_WIN) return endMatch(who === 0);
+    serve(who === 0 ? 1 : -1);
+  }
+
+  function endMatch(youWon) {
+    running = false;
+    const key = youWon ? 'pong.wins' : 'pong.losses';
+    Shell.set(key, Shell.get(key, 0) + 1);
+    record();
+    Shell.card('pong', Shell.get('pong.wins', 0) + ' wins · ' + Shell.get('pong.losses', 0) + ' losses');
+    draw();
+    Shell.overlay(youWon ? 'You win' : 'The computer wins', scores[0] + ' – ' + scores[1] + ' on ' + skill,
+      [{ label: 'Play again', primary: true, onClick: () => { newMatch(); start(); } }]);
+  }
+
+  function loop(t) {
+    if (!running) return;
+    const dt = Math.min(0.033, (t - last) / 1000);
+    last = t;
+    if (!paused) step(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function start() {
+    Shell.hideOverlay();
+    if (running) return;
+    running = true; paused = false; last = performance.now();
+    requestAnimationFrame(loop);
+  }
+  function pause() {
+    if (!running || paused) return;
+    paused = true;
+    Shell.overlay('Paused', '', [{ label: 'Resume', primary: true, onClick: resume }]);
+  }
+  function resume() { Shell.hideOverlay(); paused = false; last = performance.now(); }
+
+  function draw() {
+    if (!ball) return;
+    const c = Shell.colors;
+    ctx.fillStyle = c.surface;
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = c.line;
+    for (let y = 8; y < H; y += 24) ctx.fillRect(W / 2 - 1.5, y, 3, 12);
+    ctx.fillStyle = c.muted;
+    ctx.font = '700 56px "Bricolage Grotesque", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.globalAlpha = 0.35;
+    ctx.fillText(String(scores[0]), W / 2 - 70, 72);
+    ctx.fillText(String(scores[1]), W / 2 + 70, 72);
+    ctx.globalAlpha = 1;
+    ctx.font = '500 11px "IBM Plex Mono", monospace';
+    ctx.fillText('YOU', W / 2 - 70, 92);
+    ctx.fillText('CPU', W / 2 + 70, 92);
+    ctx.fillStyle = c.accent;
+    ctx.beginPath(); ctx.roundRect(PX, you - PH / 2, PW, PH, 6); ctx.fill();
+    ctx.fillStyle = c.ink;
+    ctx.beginPath(); ctx.roundRect(W - PX - PW, cpu - PH / 2, PW, PH, 6); ctx.fill();
+    ctx.fillStyle = c.ink;
+    ctx.beginPath(); ctx.arc(ball.x, ball.y, R, 0, Math.PI * 2); ctx.fill();
+  }
+
+  const stage = document.getElementById('stage');
+  stage.addEventListener('pointermove', (e) => {
+    if (!paused && !Shell.overlayOpen()) you = Shell.point(canvas, e, W, H).y;
+  });
+  stage.addEventListener('pointerdown', (e) => {
+    if (!paused && !Shell.overlayOpen()) you = Shell.point(canvas, e, W, H).y;
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') { keys.up = true; e.preventDefault(); }
+    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') { keys.down = true; e.preventDefault(); }
+    if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') paused ? resume() : pause();
+    if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey) { newMatch(); start(); }
+  });
+  document.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.up = false;
+    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = false;
+  });
+  document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
+    skill = b.dataset.skill;
+    Shell.set('pong.skill', skill);
+    newMatch(); start();
+  }));
+  document.getElementById('restart').addEventListener('click', () => { newMatch(); start(); });
+  Shell.onHidden(() => { keys.up = keys.down = false; pause(); });
+
+  newMatch();
+  Shell.overlay('Pong', 'Keep the ball past the computer’s paddle. First to 7 points wins.',
+    [{ label: 'Play', primary: true, onClick: start }]);
+})();
+</script>
+</body>
+</html>
