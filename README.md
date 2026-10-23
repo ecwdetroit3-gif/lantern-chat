@@ -1,15 +1,14 @@
 # Lantern
 
-A static website with browser games, a web proxy and an AI chat page. Everything runs in the browser, so it can be hosted for free on GitHub Pages.
+A static website with browser games and a web proxy. Everything runs in the browser, so it can be hosted for free on GitHub Pages.
 
 | Page | What it is |
 | --- | --- |
 | `index.html` | Home page: game library and a search box that opens in the proxy |
 | `games/` | Snake, 2048, Blocks, Minesweeper, Breakout, Flap, Pong and Connect Four |
 | `proxy.html` | Web proxy built on [Ultraviolet](https://github.com/titaniumnetwork-dev/Ultraviolet) |
-| `chat.html` | Lantern Chat (bring your own API key) |
 
-Scores, settings and chats are saved in the visitor's browser (`localStorage`). Nothing is sent to a server except proxied traffic and chat requests to the AI provider you choose.
+Scores and settings are saved in the visitor's browser (`localStorage`). Nothing is sent to a server except proxied traffic.
 
 ## Publish on GitHub Pages
 
@@ -32,7 +31,7 @@ The default Wisp server is the public one run by Mercury Workshop (`wss://wisp.m
 
 To run your own Wisp server, use [wisp-js](https://github.com/MercuryWorkshop/wisp-js) or [wisp-server-python](https://github.com/MercuryWorkshop/wisp-server-python) on any host that supports WebSockets, then enter its `wss://` address in the proxy settings.
 
-**Safety:** proxied sites run on this website's address. Ultraviolet keeps their storage apart from the rest of the site, but that isn't a hard security boundary. Don't sign in to important accounts through the proxy, and don't browse untrusted sites with it while an API key is saved in Chat.
+**Safety:** proxied sites run on this website's address. Ultraviolet keeps their storage apart from the rest of the site, but that isn't a hard security boundary. Don't sign in to important accounts through the proxy.
 
 The proxy needs a browser with service workers and shared workers (current Chrome, Edge or Firefox on a computer). Some private-browsing modes turn service workers off.
 
