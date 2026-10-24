@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Sudoku</title>
+<link rel="stylesheet" href="shell.css" />
+<style>
+  #grid{display:grid;grid-template-columns:repeat(9,36px);grid-template-rows:repeat(9,36px);background:#2a2a3a;gap:1px;border:2px solid #44445a;border-radius:6px;overflow:hidden;}
+  .cell{background:#12121a;display:grid;place-items:center;font-size:19px;font-weight:700;cursor:pointer;position:relative;}
+  .cell.given{color:#cfcee0;background:#1b1b26;cursor:default;}
+  .cell.user{color:#c4b5fd;}
+  .cell.sel{outline:2px solid #a855f7;outline-offset:-2px;z-index:2;}
+  .cell.bad{color:#f87171;}
+  .cell.br{border-right:2px solid #44445a;} .cell.bb{border-bottom:2px solid #44445a;}
+  .cell .notes{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);font-size:9px;color:#777;}
+  .cell .notes span{display:grid;place-items:center;}
+  #pad{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;max-width:300px;}
+  .np{padding:10px 0;border-radius:8px;background:#17171f;border:1px solid #262636;cursor:pointer;font-weight:700;font-size:16px;}
+  .np:hover{border-color:#a855f7;} .np.on{background:#30304a;}
+  @media(max-width:420px){#grid{grid-template-columns:repeat(9,32px);grid-template-rows:repeat(9,32px);}.cell{font-size:17px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span class="pill" id="state">Fill 1–9</span><span class="pill">Notes <b id="noteState">off</b> (N)</span></div>
+  <div id="grid"></div>
+  <div id="pad"></div>
+  <div class="msg">Click a cell, then a number. Toggle pencil marks with N or the ✎ key.</div>
+  <div class="btns"><button class="g" id="new">New puzzle</button></div>
+</div>
+<script src="shell.js"></script>
+<script>
+const gEl=document.getElementById('grid');
+let solution,puzzle,notes,given,sel=-1,noteMode=false,cells=[];
+function full(){ const g=Array.from({length:9},()=>Array(9).fill(0));
+  function ok(r,c,v){ for(let i=0;i<9;i++){ if(g[r][i]===v||g[i][c]===v)return false; } const br=3*((r/3)|0),bc=3*((c/3)|0); for(let i=0;i<3;i++)for(let j=0;j<3;j++)if(g[br+i][bc+j]===v)return false; return true; }
+  function fill(p){ if(p===81)return true; const r=(p/9)|0,c=p%9; const nums=[1,2,3,4,5,6,7,8,9].sort(()=>Math.random()-0.5); for(const v of nums){ if(ok(r,c,v)){ g[r][c]=v; if(fill(p+1))return true; g[r][c]=0; } } return false; }
+  fill(0); return g; }
+function reset(){ solution=full(); puzzle=solution.map(r=>r.slice()); given=Array.from({length:9},()=>Array(9).fill(true));
+  let removed=0, target=48; const order=[...Array(81).keys()].sort(()=>Math.random()-0.5);
+  for(const idx of order){ if(removed>=target)break; const r=(idx/9)|0,c=idx%9; puzzle[r][c]=0; given[r][c]=false; removed++; }
+  notes=Array.from({length:81},()=>new Set()); sel=-1; document.getElementById('state').textContent='Fill 1–9'; build(); }
+function build(){ gEl.innerHTML=''; cells=[]; for(let i=0;i<81;i++){ const r=(i/9)|0,c=i%9; const d=document.createElement('div'); d.className='cell'+(given[r][c]?' given':'')+((c===2||c===5)?' br':'')+((r===2||r===5)?' bb':''); d.onclick=()=>select(i); gEl.appendChild(d); cells.push(d);} render(); }
+function conflict(r,c){ const v=puzzle[r][c]; if(!v)return false; for(let i=0;i<9;i++){ if(i!==c&&puzzle[r][i]===v)return true; if(i!==r&&puzzle[i][c]===v)return true; } const br=3*((r/3)|0),bc=3*((c/3)|0); for(let i=0;i<3;i++)for(let j=0;j<3;j++){ const rr=br+i,cc=bc+j; if((rr!==r||cc!==c)&&puzzle[rr][cc]===v)return true; } return false; }
+function render(){ for(let i=0;i<81;i++){ const r=(i/9)|0,c=i%9,v=puzzle[r][c],d=cells[i]; d.classList.remove('sel','bad','user'); if(i===sel)d.classList.add('sel'); if(v){ d.textContent=v; if(!given[r][c])d.classList.add('user'); if(conflict(r,c))d.classList.add('bad'); } else { d.textContent=''; if(notes[i].size){ d.innerHTML='<div class="notes">'+[1,2,3,4,5,6,7,8,9].map(n=>'<span>'+(notes[i].has(n)?n:'')+'</span>').join('')+'</div>'; } } } }
+function select(i){ sel=i; render(); }
+function put(v){ if(sel<0)return; const r=(sel/9)|0,c=sel%9; if(given[r][c])return; if(noteMode){ if(v===0)notes[sel].clear(); else { notes[sel].has(v)?notes[sel].delete(v):notes[sel].add(v);} } else { puzzle[r][c]=v; notes[sel].clear(); Orbit.beep(480,0.03); } render(); win(); }
+function win(){ for(let r=0;r<9;r++)for(let c=0;c<9;c++){ if(!puzzle[r][c]||conflict(r,c))return; } document.getElementById('state').textContent='🎉 Solved!'; Orbit.beep(880,0.14); }
+const pad=document.getElementById('pad'); for(let n=1;n<=9;n++){ const b=document.createElement('button'); b.className='np'; b.textContent=n; b.onclick=()=>put(n); pad.appendChild(b);}
+const er=document.createElement('button'); er.className='np'; er.textContent='⌫'; er.onclick=()=>put(0); pad.appendChild(er);
+addEventListener('keydown',e=>{ if(/^[1-9]$/.test(e.key))put(+e.key); else if(e.key==='Backspace'||e.key==='Delete'||e.key==='0')put(0);
+  else if(e.key.toLowerCase()==='n'){ noteMode=!noteMode; document.getElementById('noteState').textContent=noteMode?'on':'off'; }
+  else if(sel>=0){ const r=(sel/9)|0,c=sel%9; if(e.key==='ArrowUp'&&r>0)select(sel-9); else if(e.key==='ArrowDown'&&r<8)select(sel+9); else if(e.key==='ArrowLeft'&&c>0)select(sel-1); else if(e.key==='ArrowRight'&&c<8)select(sel+1); else return; e.preventDefault(); } });
+document.getElementById('new').onclick=reset;
+reset();
+</script>
+</body>
+</html>

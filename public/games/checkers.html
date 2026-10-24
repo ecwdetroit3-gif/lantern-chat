@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Checkers</title>
+<link rel="stylesheet" href="shell.css" />
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span class="pill" id="turn">Light to move</span><span class="pill" id="note"></span></div>
+  <canvas id="c" width="400" height="400"></canvas>
+  <div class="msg">Click a piece, then a highlighted square. Captures are forced; multi-jumps chain.</div>
+  <div class="btns"><button class="g" id="new">New game</button></div>
+</div>
+<script src="shell.js"></script>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d'),S=c.width/8;
+let board,turn,sel,moves,over,chain;
+function reset(){ board=Array.from({length:8},()=>Array(8).fill(null)); turn=1; sel=null; over=false; chain=null;
+  for(let r=0;r<8;r++)for(let col=0;col<8;col++){ if((r+col)%2===1){ if(r<3)board[r][col]={p:2,k:false}; else if(r>4)board[r][col]={p:1,k:false}; } }
+  update(); draw(); }
+function dirs(pc){ return pc.k?[[-1,-1],[-1,1],[1,-1],[1,1]]:pc.p===1?[[-1,-1],[-1,1]]:[[1,-1],[1,1]]; }
+function inb(r,col){ return r>=0&&r<8&&col>=0&&col<8; }
+function captures(r,col){ const pc=board[r][col],out=[]; for(const [dr,dc] of dirs(pc)){ const mr=r+dr,mc=col+dc,lr=r+2*dr,lc=col+2*dc; if(inb(lr,lc)&&board[mr][mc]&&board[mr][mc].p!==pc.p&&!board[lr][lc])out.push({r:lr,c:lc,cap:[mr,mc]}); } return out; }
+function simple(r,col){ const pc=board[r][col],out=[]; for(const [dr,dc] of dirs(pc)){ const nr=r+dr,nc=col+dc; if(inb(nr,nc)&&!board[nr][nc])out.push({r:nr,c:nc}); } return out; }
+function allCaps(p){ const list=[]; for(let r=0;r<8;r++)for(let col=0;col<8;col++)if(board[r][col]&&board[r][col].p===p&&captures(r,col).length)list.push([r,col]); return list; }
+function legalFor(r,col){ const mustCap=allCaps(turn).length>0; return mustCap?captures(r,col):simple(r,col); }
+function update(){ document.getElementById('turn').textContent=(turn===1?'Light':'Dark')+' to move'; const w=winner(); if(w){ over=true; document.getElementById('turn').textContent=(w===1?'Light':'Dark')+' wins!'; } document.getElementById('note').textContent=allCaps(turn).length?'Capture available':''; }
+function winner(){ let p1=0,p2=0,m1=false,m2=false; for(let r=0;r<8;r++)for(let col=0;col<8;col++){ const pc=board[r][col]; if(!pc)continue; if(pc.p===1){p1++; if(simple(r,col).length||captures(r,col).length)m1=true;} else {p2++; if(simple(r,col).length||captures(r,col).length)m2=true;} } if(p2===0||!m2)return 1; if(p1===0||!m1)return 2; return 0; }
+c.addEventListener('click',e=>{ if(over)return; const r2=c.getBoundingClientRect(); const col=Math.floor((e.clientX-r2.left)*(c.width/r2.width)/S), r=Math.floor((e.clientY-r2.top)*(c.height/r2.height)/S); if(!inb(r,col))return;
+  if(chain){ tryMove(chain.r,chain.c,r,col); return; }
+  if(board[r][col]&&board[r][col].p===turn){ sel={r,c:col}; moves=legalFor(r,col); draw(); return; }
+  if(sel){ tryMove(sel.r,sel.c,r,col); }
+});
+function tryMove(fr,fc,tr,tc){
+  const mv=legalFor(fr,fc).find(m=>m.r===tr&&m.c===tc);
+  if(!mv){ if(!chain){ sel=null; draw(); } return; }
+  const pc=board[fr][fc];
+  board[tr][tc]=pc; board[fr][fc]=null;
+  if(mv.cap){ board[mv.cap[0]][mv.cap[1]]=null; Orbit.beep(300,0.06); } else Orbit.beep(440,0.05);
+  // Kinging ends the turn even mid-jump.
+  const justKinged=!pc.k && ((pc.p===1&&tr===0)||(pc.p===2&&tr===7));
+  if(justKinged) pc.k=true;
+  if(mv.cap && !justKinged && captures(tr,tc).length){
+    chain={r:tr,c:tc}; sel={r:tr,c:tc}; moves=captures(tr,tc); draw(); update(); return;
+  }
+  chain=null; sel=null; turn=turn===1?2:1; update(); draw();
+}
+function draw(){ for(let r=0;r<8;r++)for(let col=0;col<8;col++){ x.fillStyle=(r+col)%2? '#3a2a1e':'#d9c7a3'; x.fillRect(col*S,r*S,S,S); }
+  if(sel&&moves){ x.fillStyle='rgba(168,85,247,.5)'; moves.forEach(m=>{ x.beginPath(); x.arc(m.c*S+S/2,m.r*S+S/2,8,0,7); x.fill(); }); x.strokeStyle='#a855f7';x.lineWidth=3;x.strokeRect(sel.c*S+3,sel.r*S+3,S-6,S-6); }
+  for(let r=0;r<8;r++)for(let col=0;col<8;col++){ const pc=board[r][col]; if(!pc)continue; x.beginPath(); x.arc(col*S+S/2,r*S+S/2,S/2-7,0,7); x.fillStyle=pc.p===1?'#ececf4':'#1a1a22'; x.fill(); x.lineWidth=2; x.strokeStyle=pc.p===1?'#b9b9c8':'#000'; x.stroke(); if(pc.k){ x.fillStyle=pc.p===1?'#a855f7':'#fbbf24'; x.font='bold 18px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('♔',col*S+S/2,r*S+S/2+1); } }
+}
+document.getElementById('new').onclick=reset;
+reset();
+</script>
+</body>
+</html>

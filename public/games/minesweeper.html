@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Minesweeper</title>
+<link rel="stylesheet" href="shell.css" />
+<style>
+  #grid{display:grid;gap:3px;background:#1a1a24;padding:8px;border-radius:12px;border:1px solid #262636;}
+  .cell{width:30px;height:30px;display:grid;place-items:center;border-radius:5px;background:#2a2a38;font-weight:800;cursor:pointer;user-select:none;font-size:15px;}
+  .cell.open{background:#14141c;color:#cfcee0;cursor:default;}
+  .cell.mine{background:#f43f5e;}
+  .cell.flag{background:#30304a;}
+  .n1{color:#60a5fa}.n2{color:#34d399}.n3{color:#f87171}.n4{color:#a78bfa}.n5{color:#fb923c}.n6{color:#22d3ee}.n7{color:#e879f9}.n8{color:#cbd5e1}
+  @media(max-width:480px){.cell{width:26px;height:26px;font-size:13px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span class="pill">Mines <b id="mines">0</b></span><span class="pill">Time <b id="time">0</b></span><span class="pill" id="state">Playing</span></div>
+  <div id="grid"></div>
+  <div class="msg">Left-click reveals, right-click flags. On touch, tap reveals, long-press flags.</div>
+  <div class="btns"><button class="g" id="new">New game</button></div>
+</div>
+<script src="shell.js"></script>
+<script>
+const W=10,H=10,MINES=15;
+const gridEl=document.getElementById('grid'); gridEl.style.gridTemplateColumns=`repeat(${W},1fr)`;
+let cells,started,over,flags,revealed,timer,secs;
+function reset(){ clearInterval(timer); secs=0; started=false; over=false; flags=0; revealed=0;
+  document.getElementById('time').textContent=0; document.getElementById('mines').textContent=MINES; document.getElementById('state').textContent='Playing';
+  cells=[]; gridEl.innerHTML='';
+  for(let i=0;i<W*H;i++){ const d={mine:false,open:false,flag:false,n:0,el:document.createElement('div')}; d.el.className='cell';
+    d.el.addEventListener('click',()=>reveal(i));
+    d.el.addEventListener('contextmenu',e=>{e.preventDefault();flag(i);});
+    let lp; d.el.addEventListener('touchstart',e=>{lp=setTimeout(()=>{flag(i);lp=null;},350);},{passive:true});
+    d.el.addEventListener('touchend',e=>{ if(lp){clearTimeout(lp);reveal(i);} e.preventDefault(); },{passive:false});
+    cells.push(d); gridEl.appendChild(d.el); }
+}
+function place(safe){ let placed=0; while(placed<MINES){ const i=(Math.random()*W*H)|0; if(cells[i].mine||i===safe)continue; cells[i].mine=true; placed++; }
+  for(let i=0;i<W*H;i++){ if(cells[i].mine)continue; cells[i].n=neighbors(i).filter(j=>cells[j].mine).length; } }
+function neighbors(i){ const r=(i/W)|0,col=i%W,out=[]; for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){ if(!dr&&!dc)continue; const nr=r+dr,nc=col+dc; if(nr>=0&&nr<H&&nc>=0&&nc<W)out.push(nr*W+nc); } return out; }
+function reveal(i){ if(over)return; const d=cells[i]; if(d.open||d.flag)return; if(!started){started=true;place(i);timer=setInterval(()=>{if(!Orbit.paused){secs++;document.getElementById('time').textContent=secs;}},1000);}
+  if(d.mine){ d.open=true; d.el.className='cell mine'; d.el.textContent='💣'; return lose(); }
+  flood(i); check(); Orbit.beep(500,0.02);
+}
+function flood(i){ const d=cells[i]; if(d.open||d.flag||d.mine)return; d.open=true; revealed++; d.el.className='cell open'; if(d.n){ d.el.textContent=d.n; d.el.classList.add('n'+d.n); } else neighbors(i).forEach(flood); }
+function flag(i){ if(over)return; const d=cells[i]; if(d.open)return; d.flag=!d.flag; d.el.className='cell '+(d.flag?'flag':''); d.el.textContent=d.flag?'🚩':''; flags+=d.flag?1:-1; document.getElementById('mines').textContent=MINES-flags; }
+function lose(){ over=true; clearInterval(timer); cells.forEach(d=>{ if(d.mine){d.el.className='cell mine';d.el.textContent='💣';} }); document.getElementById('state').textContent='💥 Boom!'; Orbit.beep(120,0.3,'sawtooth'); }
+function check(){ if(revealed===W*H-MINES){ over=true; clearInterval(timer); document.getElementById('state').textContent='🎉 Cleared!'; Orbit.beep(880,0.1); } }
+document.getElementById('new').onclick=reset;
+reset();
+</script>
+</body>
+</html>

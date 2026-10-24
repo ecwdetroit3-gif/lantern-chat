@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Lights Out</title>
+<link rel="stylesheet" href="shell.css" />
+<style>
+  #b{display:grid;grid-template-columns:repeat(5,60px);gap:8px;}
+  .l{width:60px;height:60px;border-radius:12px;background:#17171f;border:1px solid #262636;cursor:pointer;}
+  .l.on{background:linear-gradient(135deg,#a855f7,#6366f1);box-shadow:0 0 16px rgba(168,85,247,.5);}
+  @media(max-width:420px){#b{grid-template-columns:repeat(5,52px);}.l{width:52px;height:52px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span class="pill">Moves <b id="moves">0</b></span><span class="pill" id="state">Turn them all off</span></div>
+  <div id="b"></div>
+  <div class="msg">Click a light to flip it and its four neighbours.</div>
+  <div class="btns"><button class="g" id="new">New puzzle</button></div>
+</div>
+<script src="shell.js"></script>
+<script>
+const N=5,bEl=document.getElementById('b'); let grid,els=[],moves,done;
+for(let i=0;i<N*N;i++){ const d=document.createElement('div'); d.className='l'; d.onclick=()=>click(i); bEl.appendChild(d); els.push(d); }
+function render(){ for(let i=0;i<N*N;i++)els[i].className='l'+(grid[i]?' on':''); }
+function toggle(i){ const r=(i/N)|0,col=i%N; [[0,0],[1,0],[-1,0],[0,1],[0,-1]].forEach(([dr,dc])=>{ const nr=r+dr,nc=col+dc; if(nr>=0&&nr<N&&nc>=0&&nc<N)grid[nr*N+nc]^=1; }); }
+function reset(){ grid=Array(N*N).fill(0); moves=0; done=false; document.getElementById('moves').textContent=0; document.getElementById('state').textContent='Turn them all off';
+  for(let k=0;k<8+((Math.random()*6)|0);k++)toggle((Math.random()*N*N)|0); if(grid.every(v=>!v))toggle(12); render(); }
+function click(i){ if(done)return; toggle(i); moves++; document.getElementById('moves').textContent=moves; Orbit.beep(440,0.03); render(); if(grid.every(v=>!v)){ done=true; document.getElementById('state').textContent='🎉 Solved in '+moves+'!'; Orbit.beep(880,0.12); } }
+document.getElementById('new').onclick=reset;
+reset();
+</script>
+</body>
+</html>

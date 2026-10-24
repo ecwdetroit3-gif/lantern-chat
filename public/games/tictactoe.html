@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Tic-Tac-Toe</title>
+<link rel="stylesheet" href="shell.css" />
+<style>
+  #b{display:grid;grid-template-columns:repeat(3,90px);gap:8px;}
+  .sq{width:90px;height:90px;border-radius:12px;background:#17171f;border:1px solid #262636;font-size:44px;font-weight:800;display:grid;place-items:center;cursor:pointer;}
+  .sq:hover{border-color:#a855f7;}
+  .sq.x{color:#c4b5fd;} .sq.o{color:#fbbf24;}
+  @media(max-width:420px){#b{grid-template-columns:repeat(3,72px);}.sq{width:72px;height:72px;font-size:36px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span class="pill" id="turn">Your turn (X)</span><span class="pill">Mode <b id="modeL">vs CPU</b></span></div>
+  <div id="b"></div>
+  <div class="msg">Click a cell. X is you, O is the computer (or player 2).</div>
+  <div class="btns"><button class="g" id="new">New game</button><button class="g alt" id="mode">Toggle mode</button></div>
+</div>
+<script src="shell.js"></script>
+<script>
+const bEl=document.getElementById('b');
+let board,turn,over,vsCPU=true,sq=[];
+const WINS=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+function build(){ bEl.innerHTML=''; sq=[]; for(let i=0;i<9;i++){ const d=document.createElement('div'); d.className='sq'; d.onclick=()=>play(i); bEl.appendChild(d); sq.push(d);} }
+function reset(){ board=Array(9).fill(''); turn='X'; over=false; sq.forEach(s=>{s.textContent='';s.className='sq';}); setMsg(); }
+function setMsg(){ document.getElementById('turn').textContent=over?'':(vsCPU?(turn==='X'?'Your turn (X)':'Computer…'):'Player '+(turn==='X'?'1 (X)':'2 (O)')); }
+function winner(bd){ for(const [a,b,c] of WINS){ if(bd[a]&&bd[a]===bd[b]&&bd[a]===bd[c])return bd[a]; } return bd.every(v=>v)?'draw':null; }
+function play(i){ if(over||board[i])return; if(vsCPU&&turn!=='X')return; set(i,turn); const w=winner(board); if(w)return end(w); turn=turn==='X'?'O':'X'; setMsg(); if(vsCPU&&turn==='O'&&!over)setTimeout(cpu,300); }
+function set(i,p){ board[i]=p; sq[i].textContent=p; sq[i].classList.add(p.toLowerCase()); Orbit.beep(p==='X'?520:400,0.05); }
+function end(w){ over=true; document.getElementById('turn').textContent=w==='draw'?'Draw':(w+' wins!'); Orbit.beep(w==='draw'?300:760,0.12); }
+function cpu(){ const i=best(board,'O').i; if(i!=null){ set(i,'O'); const w=winner(board); if(w)return end(w); turn='X'; setMsg(); } }
+function best(bd,p){ const w=winner(bd); if(w==='O')return{s:1}; if(w==='X')return{s:-1}; if(w==='draw')return{s:0};
+  let bi=null,bs=p==='O'?-2:2; for(let i=0;i<9;i++){ if(bd[i])continue; bd[i]=p; const s=best(bd,p==='O'?'X':'O').s; bd[i]=''; if(p==='O'?s>bs:s<bs){bs=s;bi=i;} } return{s:bs,i:bi}; }
+document.getElementById('new').onclick=reset;
+document.getElementById('mode').onclick=()=>{ vsCPU=!vsCPU; document.getElementById('modeL').textContent=vsCPU?'vs CPU':'2 players'; reset(); };
+build(); reset();
+</script>
+</body>
+</html>

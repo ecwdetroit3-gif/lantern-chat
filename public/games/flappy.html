@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Flap</title>
+<link rel="stylesheet" href="shell.css" />
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span class="pill">Score <b id="score">0</b></span><span class="pill">Best <b id="best">0</b></span></div>
+  <canvas id="c" width="360" height="480"></canvas>
+  <div class="msg" id="msg">Click, tap, Space or ↑ to flap.</div>
+  <div class="btns"><button class="g" id="new">New game</button></div>
+</div>
+<script src="shell.js"></script>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+const G=0.45, FLAP=-7.4, GAP=140, PW=56, SP=2.4;
+let y,vy,pipes,score,best=+(localStorage.getItem('orbit_flap_best')||0),started,dead,t;
+document.getElementById('best').textContent=best;
+function reset(){ y=c.height/2; vy=0; pipes=[]; score=0; started=false; dead=false; t=0; document.getElementById('score').textContent=0; document.getElementById('msg').textContent='Click, tap, Space or ↑ to flap.'; }
+function flap(){ if(dead)return; started=true; vy=FLAP; Orbit.beep(520,0.05); }
+addEventListener('keydown',e=>{ if(e.key===' '||e.key==='ArrowUp'){flap();e.preventDefault();} });
+c.addEventListener('mousedown',flap); c.addEventListener('touchstart',e=>{flap();e.preventDefault();},{passive:false});
+function step(){ if(!started||dead)return;
+  t++; vy+=G; y+=vy;
+  if(t%90===0) pipes.push({x:c.width, h:60+Math.random()*(c.height-GAP-140), passed:false});
+  pipes.forEach(p=>p.x-=SP); pipes=pipes.filter(p=>p.x>-PW);
+  for(const p of pipes){ if(!p.passed && p.x+PW<60){ p.passed=true; score++; document.getElementById('score').textContent=score; Orbit.beep(760,0.05);}
+    if(60+18>p.x && 60-18<p.x+PW && (y-16<p.h || y+16>p.h+GAP)) die(); }
+  if(y>c.height-14||y<0) die();
+}
+function die(){ if(dead)return; dead=true; best=Math.max(best,score); localStorage.setItem('orbit_flap_best',best); document.getElementById('best').textContent=best; document.getElementById('msg').textContent='Crashed! Press New game.'; Orbit.beep(130,0.25,'sawtooth'); }
+function draw(){ const grad=x.createLinearGradient(0,0,0,c.height); grad.addColorStop(0,'#141425'); grad.addColorStop(1,'#0b0b13'); x.fillStyle=grad; x.fillRect(0,0,c.width,c.height);
+  x.fillStyle='#22c55e'; pipes.forEach(p=>{ x.fillRect(p.x,0,PW,p.h); x.fillRect(p.x,p.h+GAP,PW,c.height-p.h-GAP); });
+  x.fillStyle='#fbbf24'; x.beginPath(); x.arc(60,y,16,0,7); x.fill(); x.fillStyle='#111'; x.beginPath(); x.arc(66,y-4,3,0,7); x.fill();
+  if(!started){ x.fillStyle='#cfcee0'; x.textAlign='center'; x.font='16px Inter,sans-serif'; x.fillText('Tap to start',c.width/2,c.height/2-30); }
+}
+document.getElementById('new').onclick=reset;
+reset();
+Orbit.loop(()=>{step();draw();});
+</script>
+</body>
+</html>

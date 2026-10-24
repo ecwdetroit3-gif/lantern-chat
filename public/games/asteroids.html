@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Asteroids</title>
+<link rel="stylesheet" href="shell.css" />
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span class="pill">Score <b id="score">0</b></span><span class="pill">Lives <b id="lives">3</b></span></div>
+  <canvas id="c" width="520" height="440"></canvas>
+  <div class="msg">←/→ rotate, ↑ thrust, Space fire.</div>
+  <div class="btns"><button class="g" id="new">New game</button></div>
+</div>
+<script src="shell.js"></script>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+let ship,rocks,bullets,score,lives,keys={},over,inv;
+function rand(a,b){return a+Math.random()*(b-a);}
+function reset(full){ ship={x:c.width/2,y:c.height/2,a:-Math.PI/2,vx:0,vy:0}; bullets=[]; inv=90;
+  if(full){score=0;lives=3;over=false;rocks=[]; for(let i=0;i<5;i++)spawnRock(); upd();} }
+function spawnRock(x0,y0,r){ const edge=Math.random(); rocks.push({x:x0??(edge<.5?0:c.width),y:y0??rand(0,c.height),r:r??rand(26,40),vx:rand(-1.4,1.4),vy:rand(-1.4,1.4)}); }
+function upd(){document.getElementById('score').textContent=score;document.getElementById('lives').textContent=lives;}
+addEventListener('keydown',e=>{keys[e.key]=1; if([' ','ArrowUp','ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault(); if(e.key===' ')fire();});
+addEventListener('keyup',e=>{keys[e.key]=0;});
+function fire(){ if(over)return; bullets.push({x:ship.x,y:ship.y,vx:Math.cos(ship.a)*6+ship.vx,vy:Math.sin(ship.a)*6+ship.vy,life:60}); Orbit.beep(880,0.04); }
+function wrap(o){ if(o.x<0)o.x+=c.width; if(o.x>c.width)o.x-=c.width; if(o.y<0)o.y+=c.height; if(o.y>c.height)o.y-=c.height; }
+function step(){ if(over)return; if(inv>0)inv--;
+  if(keys['ArrowLeft'])ship.a-=0.07; if(keys['ArrowRight'])ship.a+=0.07;
+  if(keys['ArrowUp']){ ship.vx+=Math.cos(ship.a)*0.12; ship.vy+=Math.sin(ship.a)*0.12; }
+  ship.vx*=0.99; ship.vy*=0.99; ship.x+=ship.vx; ship.y+=ship.vy; wrap(ship);
+  bullets.forEach(b=>{b.x+=b.vx;b.y+=b.vy;b.life--;wrap(b);}); bullets=bullets.filter(b=>b.life>0);
+  rocks.forEach(r=>{r.x+=r.vx;r.y+=r.vy;wrap(r);});
+  for(let i=rocks.length-1;i>=0;i--){ const r=rocks[i];
+    for(let j=bullets.length-1;j>=0;j--){ const b=bullets[j]; if(Math.hypot(b.x-r.x,b.y-r.y)<r.r){ bullets.splice(j,1); rocks.splice(i,1); score+=20; upd(); Orbit.beep(300,0.06); if(r.r>22){spawnRock(r.x,r.y,r.r/1.8);spawnRock(r.x,r.y,r.r/1.8);} break; } }
+    if(inv<=0 && Math.hypot(ship.x-r.x,ship.y-r.y)<r.r+8){ lives--; upd(); Orbit.beep(120,0.3,'sawtooth'); if(lives<=0)over=true; else reset(false); break; }
+  }
+  if(rocks.length===0){ for(let i=0;i<5;i++)spawnRock(); }
+}
+function draw(){ x.fillStyle='#0b0b13';x.fillRect(0,0,c.width,c.height);
+  x.strokeStyle='#8b8b9a'; rocks.forEach(r=>{ x.beginPath(); x.arc(r.x,r.y,r.r,0,7); x.stroke(); });
+  x.fillStyle='#fff'; bullets.forEach(b=>{x.fillRect(b.x-1.5,b.y-1.5,3,3);});
+  if(!over && !(inv>0 && (inv>>2)%2)){ x.save(); x.translate(ship.x,ship.y); x.rotate(ship.a); x.strokeStyle='#c4b5fd'; x.beginPath(); x.moveTo(12,0); x.lineTo(-9,-7); x.lineTo(-5,0); x.lineTo(-9,7); x.closePath(); x.stroke(); x.restore(); }
+  if(over){ x.fillStyle='rgba(8,8,12,.72)';x.fillRect(0,0,c.width,c.height); x.fillStyle='#fff';x.textAlign='center';x.font='bold 26px Inter,sans-serif'; x.fillText('Game over',c.width/2,c.height/2); x.font='15px Inter,sans-serif';x.fillStyle='#a2a1b4'; x.fillText('Score '+score+' — press New game',c.width/2,c.height/2+28); }
+}
+document.getElementById('new').onclick=()=>reset(true);
+reset(true);
+Orbit.loop(()=>{step();draw();});
+</script>
+</body>
+</html>

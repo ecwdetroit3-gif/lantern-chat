@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>15 Puzzle</title>
+<link rel="stylesheet" href="shell.css" />
+<style>
+  #b{display:grid;grid-template-columns:repeat(4,72px);gap:8px;}
+  .t{width:72px;height:72px;border-radius:12px;background:linear-gradient(135deg,#6d28d9,#4f46e5);display:grid;place-items:center;font-size:26px;font-weight:800;cursor:pointer;}
+  .t.blank{background:transparent;cursor:default;}
+  @media(max-width:420px){#b{grid-template-columns:repeat(4,62px);}.t{width:62px;height:62px;font-size:22px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span class="pill">Moves <b id="moves">0</b></span><span class="pill" id="state"></span></div>
+  <div id="b"></div>
+  <div class="msg">Click a tile next to the gap, or use arrow keys.</div>
+  <div class="btns"><button class="g" id="new">Shuffle</button></div>
+</div>
+<script src="shell.js"></script>
+<script>
+const bEl=document.getElementById('b'); let arr,moves,els=[];
+for(let i=0;i<16;i++){ const d=document.createElement('div'); d.onclick=()=>clickAt(i); bEl.appendChild(d); els.push(d); }
+function render(){ for(let i=0;i<16;i++){ const v=arr[i]; els[i].className='t'+(v===0?' blank':''); els[i].textContent=v===0?'':v; } document.getElementById('moves').textContent=moves; document.getElementById('state').textContent=solved()?'🎉 Solved!':''; }
+function solved(){ for(let i=0;i<15;i++)if(arr[i]!==i+1)return false; return arr[15]===0; }
+function blank(){ return arr.indexOf(0); }
+function canMove(i){ const b=blank(); const r=(i/4)|0,col=i%4,br=(b/4)|0,bc=b%4; return (r===br&&Math.abs(col-bc)===1)||(col===bc&&Math.abs(r-br)===1); }
+function move(i){ const b=blank(); [arr[b],arr[i]]=[arr[i],arr[b]]; moves++; Orbit.beep(400,0.03); render(); }
+function clickAt(i){ if(canMove(i))move(i); }
+addEventListener('keydown',e=>{ const b=blank(),r=(b/4)|0,col=b%4; let t=-1;
+  if(e.key==='ArrowUp'&&r<3)t=b+4; else if(e.key==='ArrowDown'&&r>0)t=b-4; else if(e.key==='ArrowLeft'&&col<3)t=b+1; else if(e.key==='ArrowRight'&&col>0)t=b-1;
+  if(t>=0){ move(t); e.preventDefault(); } });
+function shuffle(){ arr=[...Array(15).keys()].map(n=>n+1).concat(0); moves=0; let b=15; for(let k=0;k<300;k++){ const r=(b/4)|0,col=b%4,opts=[]; if(r>0)opts.push(b-4); if(r<3)opts.push(b+4); if(col>0)opts.push(b-1); if(col<3)opts.push(b+1); const t=opts[(Math.random()*opts.length)|0]; [arr[b],arr[t]]=[arr[t],arr[b]]; b=t; } render(); }
+document.getElementById('new').onclick=shuffle;
+shuffle();
+</script>
+</body>
+</html>

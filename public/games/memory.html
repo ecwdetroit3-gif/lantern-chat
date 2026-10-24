@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Memory Match</title>
+<link rel="stylesheet" href="shell.css" />
+<style>
+  #b{display:grid;grid-template-columns:repeat(4,72px);gap:10px;}
+  .card{width:72px;height:72px;border-radius:12px;background:linear-gradient(135deg,#a855f7,#6366f1);display:grid;place-items:center;font-size:34px;cursor:pointer;color:transparent;user-select:none;}
+  .card.up{background:#17171f;border:1px solid #333345;color:#fff;}
+  .card.done{background:#153a2a;border:1px solid #1f6f4a;color:#fff;cursor:default;}
+  @media(max-width:420px){#b{grid-template-columns:repeat(4,62px);}.card{width:62px;height:62px;font-size:28px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span class="pill">Moves <b id="moves">0</b></span><span class="pill">Pairs <b id="pairs">0</b>/8</span><span class="pill">Time <b id="time">0</b></span></div>
+  <div id="b"></div>
+  <div class="msg">Flip two cards to find matching pairs.</div>
+  <div class="btns"><button class="g" id="new">New game</button></div>
+</div>
+<script src="shell.js"></script>
+<script>
+const EMOJI=['🍎','🚀','🌟','🎲','🎧','🐱','⚽','🍕'];
+const bEl=document.getElementById('b');
+let cards,first,lock,moves,pairs,timer,secs,started;
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function reset(){ clearInterval(timer); secs=0;started=false;moves=0;pairs=0;first=null;lock=false;
+  document.getElementById('moves').textContent=0;document.getElementById('pairs').textContent=0;document.getElementById('time').textContent=0;
+  const deck=shuffle([...EMOJI,...EMOJI].map((e,i)=>({e,i}))); bEl.innerHTML=''; cards=[];
+  deck.forEach((d,idx)=>{ const el=document.createElement('div'); el.className='card'; el.textContent=d.e; el.onclick=()=>flip(idx); bEl.appendChild(el); cards.push({...d,el,up:false,done:false}); });
+}
+function flip(i){ const card=cards[i]; if(lock||card.up||card.done)return; if(!started){started=true;timer=setInterval(()=>{if(!Orbit.paused){secs++;document.getElementById('time').textContent=secs;}},1000);}
+  card.up=true; card.el.className='card up'; Orbit.beep(500,0.03);
+  if(first==null){ first=i; return; }
+  moves++; document.getElementById('moves').textContent=moves;
+  if(cards[first].e===card.e){ cards[first].done=card.done=true; cards[first].el.className=card.el.className='card done'; first=null; pairs++; document.getElementById('pairs').textContent=pairs; Orbit.beep(760,0.08); if(pairs===8){ clearInterval(timer); document.querySelector('.msg').textContent='Solved in '+moves+' moves, '+secs+'s!'; } }
+  else { lock=true; const a=first; first=null; setTimeout(()=>{ cards[a].up=cards[i].up=false; cards[a].el.className=cards[i].el.className='card'; lock=false; },700); }
+}
+document.getElementById('new').onclick=reset;
+reset();
+</script>
+</body>
+</html>

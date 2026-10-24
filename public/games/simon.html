@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Simon</title>
+<link rel="stylesheet" href="shell.css" />
+<style>
+  #pads{display:grid;grid-template-columns:repeat(2,110px);gap:12px;}
+  .pad{width:110px;height:110px;border-radius:16px;cursor:pointer;opacity:.55;transition:opacity .1s;}
+  .pad.lit{opacity:1;box-shadow:0 0 24px currentColor;}
+  .p0{background:#22c55e;color:#22c55e;} .p1{background:#f43f5e;color:#f43f5e;}
+  .p2{background:#3b82f6;color:#3b82f6;} .p3{background:#fbbf24;color:#fbbf24;}
+  @media(max-width:420px){#pads{grid-template-columns:repeat(2,88px);}.pad{width:88px;height:88px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span class="pill">Level <b id="level">0</b></span><span class="pill">Best <b id="best">0</b></span></div>
+  <div id="pads"></div>
+  <div class="msg" id="msg">Press Start, then repeat the sequence.</div>
+  <div class="btns"><button class="g" id="start">Start</button></div>
+</div>
+<script src="shell.js"></script>
+<script>
+const FREQ=[330,415,247,523];
+const padsEl=document.getElementById('pads'); let pads=[];
+for(let i=0;i<4;i++){ const d=document.createElement('div'); d.className='pad p'+i; d.onclick=()=>click(i); padsEl.appendChild(d); pads.push(d); }
+let seq,input,playing,best=+(localStorage.getItem('orbit_simon_best')||0);
+document.getElementById('best').textContent=best;
+function light(i,ms){ pads[i].classList.add('lit'); Orbit.beep(FREQ[i],ms/1000,'sine',0.2); setTimeout(()=>pads[i].classList.remove('lit'),ms); }
+async function playSeq(){ playing=true; input=[]; document.getElementById('msg').textContent='Watch…'; await wait(500);
+  for(const i of seq){ light(i,420); await wait(640); } playing=false; document.getElementById('msg').textContent='Your turn'; }
+function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+function start(){ seq=[]; document.getElementById('level').textContent=0; next(); }
+function next(){ seq.push((Math.random()*4)|0); document.getElementById('level').textContent=seq.length; playSeq(); }
+function click(i){ if(playing||!seq||!seq.length)return; light(i,220); input.push(i); const idx=input.length-1;
+  if(input[idx]!==seq[idx]){ document.getElementById('msg').textContent='Wrong! You reached level '+(seq.length-1)+'. Press Start.'; best=Math.max(best,seq.length-1); localStorage.setItem('orbit_simon_best',best); document.getElementById('best').textContent=best; Orbit.beep(110,0.4,'sawtooth'); seq=null; return; }
+  if(input.length===seq.length){ document.getElementById('msg').textContent='Nice!'; setTimeout(next,700); }
+}
+document.getElementById('start').onclick=start;
+</script>
+</body>
+</html>

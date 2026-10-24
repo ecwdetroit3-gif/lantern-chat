@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Hangman</title>
+<link rel="stylesheet" href="shell.css" />
+<style>
+  #word{font-size:30px;letter-spacing:8px;font-weight:800;min-height:40px;}
+  #keys{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;max-width:420px;}
+  .k{padding:9px 0;border-radius:8px;background:#17171f;border:1px solid #262636;cursor:pointer;font-weight:700;text-transform:uppercase;}
+  .k:hover{border-color:#a855f7;} .k.good{background:#14402c;color:#86efac;} .k.bad{background:#401414;color:#fca5a5;} .k:disabled{cursor:default;opacity:.7;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span class="pill">Lives <b id="lives">6</b></span><span class="pill" id="state"></span></div>
+  <canvas id="c" width="170" height="170"></canvas>
+  <div id="word"></div>
+  <div id="keys"></div>
+  <div class="msg">Click a letter or type it.</div>
+  <div class="btns"><button class="g" id="new">New word</button></div>
+</div>
+<script src="shell.js"></script>
+<script>
+const WORDS=['planet','rocket','galaxy','meteor','gravity','orbit','comet','nebula','cosmos','asteroid','eclipse','quasar','satellite','lunar','velocity','spectrum','horizon','voyage','beacon','cluster'];
+const c=document.getElementById('c'),x=c.getContext('2d');
+let word,guessed,lives,over;
+function reset(){ word=WORDS[(Math.random()*WORDS.length)|0]; guessed=new Set(); lives=6; over=false; document.getElementById('lives').textContent=6; document.getElementById('state').textContent='';
+  buildKeys(); render(); draw(); }
+function buildKeys(){ const kEl=document.getElementById('keys'); kEl.innerHTML=''; for(let i=97;i<=122;i++){ const ch=String.fromCharCode(i); const b=document.createElement('button'); b.className='k'; b.textContent=ch; b.onclick=()=>guess(ch); kEl.appendChild(b);} }
+function render(){ document.getElementById('word').textContent=word.split('').map(ch=>guessed.has(ch)?ch:'_').join(' '); }
+function guess(ch){ if(over||guessed.has(ch))return; guessed.add(ch); const btns=[...document.querySelectorAll('.k')]; const b=btns.find(x=>x.textContent===ch); if(b)b.disabled=true;
+  if(word.includes(ch)){ if(b)b.classList.add('good'); Orbit.beep(620,0.05); render(); if(word.split('').every(c2=>guessed.has(c2))){ over=true; document.getElementById('state').textContent='🎉 You win!'; Orbit.beep(880,0.12);} }
+  else { if(b)b.classList.add('bad'); lives--; document.getElementById('lives').textContent=lives; Orbit.beep(180,0.12,'sawtooth'); draw(); if(lives<=0){ over=true; document.getElementById('state').textContent='💀 Word was "'+word+'"'; render2(); } }
+}
+function render2(){ document.getElementById('word').textContent=word.split('').join(' '); }
+addEventListener('keydown',e=>{ const ch=e.key.toLowerCase(); if(/^[a-z]$/.test(ch))guess(ch); });
+function draw(){ x.clearRect(0,0,c.width,c.height); x.strokeStyle='#8b8b9a'; x.lineWidth=3; x.beginPath();
+  x.moveTo(20,160);x.lineTo(90,160); x.moveTo(45,160);x.lineTo(45,20); x.lineTo(115,20); x.lineTo(115,40); x.stroke();
+  const parts=6-lives; x.strokeStyle='#c4b5fd';
+  if(parts>0){x.beginPath();x.arc(115,52,12,0,7);x.stroke();}
+  if(parts>1){x.beginPath();x.moveTo(115,64);x.lineTo(115,100);x.stroke();}
+  if(parts>2){x.beginPath();x.moveTo(115,72);x.lineTo(98,88);x.stroke();}
+  if(parts>3){x.beginPath();x.moveTo(115,72);x.lineTo(132,88);x.stroke();}
+  if(parts>4){x.beginPath();x.moveTo(115,100);x.lineTo(100,124);x.stroke();}
+  if(parts>5){x.beginPath();x.moveTo(115,100);x.lineTo(130,124);x.stroke();}
+}
+document.getElementById('new').onclick=reset;
+reset();
+</script>
+</body>
+</html>

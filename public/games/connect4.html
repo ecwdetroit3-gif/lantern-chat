@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Connect Four</title>
+<link rel="stylesheet" href="shell.css" />
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span class="pill" id="turn">Red to play</span><span class="pill">Mode <b id="modeL">vs CPU</b></span></div>
+  <canvas id="c" width="350" height="300"></canvas>
+  <div class="msg">Click a column to drop a disc.</div>
+  <div class="btns"><button class="g" id="new">New game</button><button class="g alt" id="mode">Toggle mode</button></div>
+</div>
+<script src="shell.js"></script>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+const COLS=7,ROWS=6,S=c.width/COLS;
+let board,turn,over,vsCPU=true;
+function reset(){ board=Array.from({length:ROWS},()=>Array(COLS).fill(0)); turn=1; over=false; setTurn(); draw(); }
+function setTurn(){ document.getElementById('turn').textContent=over?'':(turn===1?'Red':'Yellow')+' to play'; }
+function drop(col){ if(over)return; for(let r=ROWS-1;r>=0;r--){ if(!board[r][col]){ board[r][col]=turn; Orbit.beep(400,0.05); if(win(r,col,turn)){ over=true; document.getElementById('turn').textContent=(turn===1?'Red':'Yellow')+' wins!'; draw(); return true; } if(board.every(row=>row.every(v=>v))){ over=true; document.getElementById('turn').textContent='Draw'; draw(); return true; } turn=turn===1?2:1; setTurn(); draw(); return true; } } return false; }
+function win(r,col,p){ const dirs=[[0,1],[1,0],[1,1],[1,-1]]; for(const [dr,dc] of dirs){ let n=1; for(const s of [1,-1]){ let rr=r+dr*s,cc=col+dc*s; while(rr>=0&&rr<ROWS&&cc>=0&&cc<COLS&&board[rr][cc]===p){n++;rr+=dr*s;cc+=dc*s;} } if(n>=4)return true; } return false; }
+function valid(){ const out=[]; for(let col=0;col<COLS;col++)if(!board[0][col])out.push(col); return out; }
+function cpuMove(){ const v=valid(); if(!v.length)return;
+  // win or block by simulation
+  for(const p of [2,1]){ for(const col of v){ let r=lowest(col); board[r][col]=p; const w=win(r,col,p); board[r][col]=0; if(w){ return drop(col); } } }
+  const pref=v.sort((a,b)=>Math.abs(3-a)-Math.abs(3-b)); drop(pref[0]);
+}
+function lowest(col){ for(let r=ROWS-1;r>=0;r--)if(!board[r][col])return r; return -1; }
+c.addEventListener('click',e=>{ if(over)return; const r=c.getBoundingClientRect(); const col=Math.floor((e.clientX-r.left)*(c.width/r.width)/S); if(drop(col) && vsCPU && !over && turn===2){ setTimeout(cpuMove,350); } });
+function draw(){ x.fillStyle='#1538a8';x.fillRect(0,0,c.width,c.height);
+  for(let r=0;r<ROWS;r++)for(let col=0;col<COLS;col++){ const v=board[r][col]; x.fillStyle=v===1?'#f43f5e':v===2?'#fbbf24':'#0e0e15'; x.beginPath(); x.arc(col*S+S/2,r*S+S/2,S/2-5,0,7); x.fill(); } }
+document.getElementById('new').onclick=reset;
+document.getElementById('mode').onclick=()=>{ vsCPU=!vsCPU; document.getElementById('modeL').textContent=vsCPU?'vs CPU':'2 players'; reset(); };
+reset();
+</script>
+</body>
+</html>

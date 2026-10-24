@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Reaction Test</title>
+<link rel="stylesheet" href="shell.css" />
+<style>
+  #pad{width:300px;height:220px;border-radius:16px;display:grid;place-items:center;cursor:pointer;font-size:20px;font-weight:700;text-align:center;padding:16px;user-select:none;}
+  .wait{background:#b91c1c;} .go{background:#16a34a;} .idle{background:#17171f;border:1px solid #262636;} .early{background:#7c2d12;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span class="pill">Last <b id="last">—</b></span><span class="pill">Best <b id="best">—</b></span></div>
+  <div id="pad" class="idle">Click to start</div>
+  <div class="msg" id="msg">When the box turns green, click as fast as you can.</div>
+</div>
+<script src="shell.js"></script>
+<script>
+const pad=document.getElementById('pad'); let state='idle',t0,to,best=+(localStorage.getItem('orbit_react_best')||0);
+if(best)document.getElementById('best').textContent=best+' ms';
+function arm(){ state='wait'; pad.className='wait'; pad.textContent='Wait for green…'; to=setTimeout(()=>{ if(Orbit.paused){arm();return;} state='go'; pad.className='go'; pad.textContent='CLICK!'; t0=performance.now(); }, 1200+Math.random()*2500); }
+pad.addEventListener('pointerdown',()=>{
+  if(state==='idle'||state==='done'||state==='early'){ arm(); return; }
+  if(state==='wait'){ clearTimeout(to); state='early'; pad.className='early'; pad.textContent='Too early! Click to retry'; Orbit.beep(140,0.2,'sawtooth'); return; }
+  if(state==='go'){ const ms=Math.round(performance.now()-t0); state='done'; pad.className='idle'; pad.textContent=ms+' ms — click to retry'; document.getElementById('last').textContent=ms+' ms'; if(!best||ms<best){ best=ms; localStorage.setItem('orbit_react_best',best); document.getElementById('best').textContent=best+' ms'; } Orbit.beep(760,0.08); }
+});
+</script>
+</body>
+</html>

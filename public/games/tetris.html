@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Block Drop</title>
+<link rel="stylesheet" href="shell.css" />
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span class="pill">Score <b id="score">0</b></span><span class="pill">Lines <b id="lines">0</b></span><span class="pill">Level <b id="lvl">1</b></span></div>
+  <canvas id="c" width="260" height="440"></canvas>
+  <div class="msg">←/→ move · ↑/X rotate · ↓ soft · Space hard · P pause</div>
+  <div class="btns"><button class="g" id="new">New game</button></div>
+</div>
+<script src="shell.js"></script>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+const COLS=10,ROWS=20,S=c.width/COLS;
+const SHAPES={I:[[1,1,1,1]],O:[[1,1],[1,1]],T:[[0,1,0],[1,1,1]],S:[[0,1,1],[1,1,0]],Z:[[1,1,0],[0,1,1]],J:[[1,0,0],[1,1,1]],L:[[0,0,1],[1,1,1]]};
+const COL={I:'#22d3ee',O:'#f59e0b',T:'#a855f7',S:'#22c55e',Z:'#f43f5e',J:'#3b82f6',L:'#f97316'};
+let board,cur,px,py,score,lines,level,drop,acc,over,paused2;
+function reset(){ board=Array.from({length:ROWS},()=>Array(COLS).fill(null)); score=0;lines=0;level=1;acc=0;over=false;paused2=false; spawn(); upd(); }
+function upd(){document.getElementById('score').textContent=score;document.getElementById('lines').textContent=lines;document.getElementById('lvl').textContent=level;}
+function spawn(){ const keys=Object.keys(SHAPES); const k=keys[(Math.random()*keys.length)|0]; cur={k,m:SHAPES[k].map(r=>r.slice())}; px=(COLS>>1)-((cur.m[0].length)>>1); py=0; if(collide(px,py,cur.m)){over=true;} }
+function collide(nx,ny,m){ for(let r=0;r<m.length;r++)for(let col=0;col<m[r].length;col++){ if(!m[r][col])continue; const bx=nx+col,by=ny+r; if(bx<0||bx>=COLS||by>=ROWS)return true; if(by>=0&&board[by][bx])return true; } return false; }
+function rotateM(m){ const R=m.length,C=m[0].length; const r=Array.from({length:C},()=>Array(R).fill(0)); for(let i=0;i<R;i++)for(let j=0;j<C;j++)r[j][R-1-i]=m[i][j]; return r; }
+function lock(){ for(let r=0;r<cur.m.length;r++)for(let col=0;col<cur.m[r].length;col++){ if(cur.m[r][col]){ const by=py+r; if(by>=0)board[by][px+col]=COL[cur.k]; } }
+  let cleared=0; for(let r=ROWS-1;r>=0;r--){ if(board[r].every(v=>v)){ board.splice(r,1); board.unshift(Array(COLS).fill(null)); cleared++; r++; } }
+  if(cleared){ score+=[0,100,300,500,800][cleared]*level; lines+=cleared; level=1+((lines/10)|0); Orbit.beep(660,0.08); } upd(); spawn();
+}
+function softDrop(){ if(!collide(px,py+1,cur.m)){py++;} else lock(); }
+addEventListener('keydown',e=>{ if(over)return; const k=e.key.toLowerCase();
+  if(k==='arrowleft'){ if(!collide(px-1,py,cur.m))px--; }
+  else if(k==='arrowright'){ if(!collide(px+1,py,cur.m))px++; }
+  else if(k==='arrowdown'){ softDrop(); }
+  else if(k==='arrowup'||k==='x'){ const m=rotateM(cur.m); if(!collide(px,py,m))cur.m=m; else if(!collide(px-1,py,m)){cur.m=m;px--;} else if(!collide(px+1,py,m)){cur.m=m;px++;} Orbit.beep(520,0.03); }
+  else if(k===' '){ while(!collide(px,py+1,cur.m))py++; lock(); }
+  else if(k==='p'){ paused2=!paused2; document.getElementById('msg').textContent=paused2?'Paused — press P':'←/→ move · ↑/X rotate · ↓ soft · Space hard · P pause'; }
+  if(['arrowleft','arrowright','arrowup','arrowdown',' '].includes(k))e.preventDefault();
+});
+function tap(dir){ if(over)return; if(dir==='l'&&!collide(px-1,py,cur.m))px--; if(dir==='r'&&!collide(px+1,py,cur.m))px++; if(dir==='d')softDrop(); if(dir==='u'){const m=rotateM(cur.m); if(!collide(px,py,m))cur.m=m;} }
+c.addEventListener('touchstart',e=>{ const r=c.getBoundingClientRect(); const tx=(e.touches[0].clientX-r.left)/r.width, ty=(e.touches[0].clientY-r.top)/r.height; if(ty>0.72)tap('d'); else if(tx<0.33)tap('l'); else if(tx>0.66)tap('r'); else tap('u'); e.preventDefault(); },{passive:false});
+function step(dt){ if(over||paused2)return; acc+=dt; const spd=Math.max(90,520-(level-1)*45); if(acc>spd){ acc=0; softDrop(); } }
+function cell(col,r,color){ x.fillStyle=color; x.fillRect(col*S+1,r*S+1,S-2,S-2); }
+function draw(){ x.fillStyle='#0e0e15';x.fillRect(0,0,c.width,c.height);
+  x.strokeStyle='#18181f'; for(let i=0;i<=COLS;i++){x.beginPath();x.moveTo(i*S,0);x.lineTo(i*S,c.height);x.stroke();}
+  for(let r=0;r<ROWS;r++)for(let col=0;col<COLS;col++)if(board[r][col])cell(col,r,board[r][col]);
+  if(!over)for(let r=0;r<cur.m.length;r++)for(let col=0;col<cur.m[r].length;col++)if(cur.m[r][col]&&py+r>=0)cell(px+col,py+r,COL[cur.k]);
+  if(over){ x.fillStyle='rgba(8,8,12,.75)';x.fillRect(0,0,c.width,c.height); x.fillStyle='#fff';x.textAlign='center';x.font='bold 22px Inter,sans-serif'; x.fillText('Game over',c.width/2,c.height/2); x.font='14px Inter,sans-serif';x.fillStyle='#a2a1b4'; x.fillText('Score '+score,c.width/2,c.height/2+24); }
+}
+document.getElementById('new').onclick=reset;
+reset();
+Orbit.loop((dt)=>{step(dt);draw();});
+</script>
+</body>
+</html>

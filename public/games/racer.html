@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Road Racer</title>
+<link rel="stylesheet" href="shell.css" />
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span class="pill">Score <b id="score">0</b></span><span class="pill">Best <b id="best">0</b></span></div>
+  <canvas id="c" width="320" height="460"></canvas>
+  <div class="msg" id="msg">←/→ or A/D to change lanes. Avoid traffic.</div>
+  <div class="btns"><button class="g" id="new">New game</button></div>
+</div>
+<script src="shell.js"></script>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+const LANES=4, LW=c.width/LANES, CARW=42, CARH=70;
+let lane,cars,score,best=+(localStorage.getItem('orbit_racer_best')||0),speed,dead,dash,spawnT;
+document.getElementById('best').textContent=best;
+function laneX(l){ return l*LW + (LW-CARW)/2; }
+function reset(){ lane=1; cars=[]; score=0; speed=4; dead=false; dash=0; spawnT=0; document.getElementById('score').textContent=0; document.getElementById('msg').textContent='←/→ or A/D to change lanes.'; }
+addEventListener('keydown',e=>{ const k=e.key.toLowerCase(); if((k==='arrowleft'||k==='a')&&lane>0){lane--;e.preventDefault();} if((k==='arrowright'||k==='d')&&lane<LANES-1){lane++;e.preventDefault();} });
+let tx=null; c.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;},{passive:true});
+c.addEventListener('touchend',e=>{ if(tx==null)return; const r=c.getBoundingClientRect(); const mid=r.left+r.width/2; if(tx<mid&&lane>0)lane--; else if(tx>=mid&&lane<LANES-1)lane++; tx=null; });
+function step(){ if(dead)return;
+  dash=(dash+speed)%40; spawnT+=speed;
+  if(spawnT>190){ spawnT=0; const l=(Math.random()*LANES)|0; cars.push({l, y:-CARH}); }
+  cars.forEach(o=>o.y+=speed);
+  cars=cars.filter(o=>{ if(o.y>c.height){ score++; document.getElementById('score').textContent=score; if(score%8===0)speed+=0.5; return false;} return true; });
+  const py=c.height-CARH-16;
+  for(const o of cars){ if(o.l===lane && o.y+CARH>py && o.y<py+CARH){ dead=true; best=Math.max(best,score); localStorage.setItem('orbit_racer_best',best); document.getElementById('best').textContent=best; document.getElementById('msg').textContent='Crash! Press New game.'; Orbit.beep(120,0.3,'sawtooth'); } }
+}
+function car(px,py,color){ x.fillStyle=color; x.fillRect(px,py,CARW,CARH); x.fillStyle='#0b0b13'; x.fillRect(px+6,py+10,CARW-12,16); x.fillRect(px+6,py+CARH-26,CARW-12,16); }
+function draw(){ x.fillStyle='#15151c';x.fillRect(0,0,c.width,c.height);
+  x.strokeStyle='#3a3a4a'; x.lineWidth=3; x.setLineDash([20,20]); for(let l=1;l<LANES;l++){ x.beginPath(); x.moveTo(l*LW,-40+dash); x.lineTo(l*LW,c.height); x.stroke(); } x.setLineDash([]);
+  cars.forEach(o=>car(laneX(o.l),o.y,'#f43f5e'));
+  car(laneX(lane),c.height-CARH-16,'#c4b5fd');
+  if(dead){ x.fillStyle='rgba(8,8,12,.72)';x.fillRect(0,0,c.width,c.height); x.fillStyle='#fff';x.textAlign='center';x.font='bold 24px Inter,sans-serif'; x.fillText('Crashed',c.width/2,c.height/2); x.font='15px Inter,sans-serif';x.fillStyle='#a2a1b4'; x.fillText('Score '+score,c.width/2,c.height/2+26); }
+}
+document.getElementById('new').onclick=reset;
+reset();
+Orbit.loop(()=>{step();draw();});
+</script>
+</body>
+</html>

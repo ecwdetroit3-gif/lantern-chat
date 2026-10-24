@@ -1,0 +1,38 @@
+/* Shared styling for ORBIT's bundled games. Dark, centered, responsive. */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%;
+  background: radial-gradient(900px 500px at 50% -10%, #1a1a28, #0b0b11 60%);
+  color: #ecebf4;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+.wrap {
+  height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; padding: 14px; text-align: center;
+}
+.hud {
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: center;
+  font-weight: 700; font-size: 15px; color: #cfcee0;
+}
+.hud .pill {
+  background: #17171f; border: 1px solid #262636; border-radius: 999px; padding: 6px 14px;
+}
+.hud .pill b { color: #fff; }
+.msg { min-height: 20px; color: #a2a1b4; font-size: 14px; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+button.g {
+  background: linear-gradient(135deg, #a855f7, #6366f1); color: #fff; border: 0;
+  border-radius: 10px; padding: 9px 16px; font-weight: 700; cursor: pointer; font-size: 14px;
+}
+button.g.alt { background: #17171f; border: 1px solid #333345; }
+button.g:hover { filter: brightness(1.08); }
+button.g:active { transform: translateY(1px); }
+canvas { background: #0e0e15; border: 1px solid #262636; border-radius: 12px; touch-action: none; max-width: 100%; height: auto; }
+.board { background: #0e0e15; border: 1px solid #262636; border-radius: 12px; display: inline-block; }
+a.link { color: #c4b5fd; }
+.center-note { position: fixed; inset: 0; display: none; place-items: center; background: rgba(8,8,12,0.78); z-index: 5; }
+.center-note.show { display: grid; }
+.center-note .card { background: #15151e; border: 1px solid #2a2a3a; border-radius: 14px; padding: 22px 26px; max-width: 320px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

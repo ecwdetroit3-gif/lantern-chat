@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Pong</title>
+<link rel="stylesheet" href="shell.css" />
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span class="pill">You <b id="p1">0</b></span><span class="pill">CPU <b id="p2">0</b></span></div>
+  <canvas id="c" width="600" height="380"></canvas>
+  <div class="msg">W/S or ↑/↓ to move. First to 7 wins.</div>
+  <div class="btns"><button class="g" id="new">New game</button></div>
+</div>
+<script src="shell.js"></script>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+const PW=10,PH=74,BALL=9;
+let ly,ry,bx,by,bvx,bvy,s1,s2,up,down,over;
+function reset(full){ ly=ry=(c.height-PH)/2; serve(Math.random()<.5?1:-1); if(full){s1=0;s2=0;over=false;upd();} }
+function serve(dir){ bx=c.width/2; by=c.height/2; const a=(Math.random()*0.6-0.3); bvx=dir*4.2; bvy=4.2*Math.sin(a*2); }
+function upd(){ document.getElementById('p1').textContent=s1; document.getElementById('p2').textContent=s2; }
+addEventListener('keydown',e=>{const k=e.key.toLowerCase(); if(k==='w'||k==='arrowup')up=1; if(k==='s'||k==='arrowdown')down=1; if(['arrowup','arrowdown'].includes(k))e.preventDefault();});
+addEventListener('keyup',e=>{const k=e.key.toLowerCase(); if(k==='w'||k==='arrowup')up=0; if(k==='s'||k==='arrowdown')down=0;});
+c.addEventListener('touchmove',e=>{const r=c.getBoundingClientRect(); const ty=(e.touches[0].clientY-r.top)*(c.height/r.height); ly=Math.max(0,Math.min(c.height-PH,ty-PH/2)); e.preventDefault();},{passive:false});
+function step(){ if(over)return;
+  if(up)ly-=6; if(down)ly+=6; ly=Math.max(0,Math.min(c.height-PH,ly));
+  const target=by-PH/2; ry+=Math.max(-4.6,Math.min(4.6,(target-ry)*0.12)); ry=Math.max(0,Math.min(c.height-PH,ry));
+  bx+=bvx; by+=bvy;
+  if(by<0){by=0;bvy*=-1;} if(by>c.height-BALL){by=c.height-BALL;bvy*=-1;}
+  if(bx<=18 && by+BALL>=ly && by<=ly+PH && bvx<0){ bvx=Math.abs(bvx)*1.05; bvy+=((by-(ly+PH/2))/PH)*5; Orbit.beep(440,0.05); }
+  if(bx>=c.width-18-BALL && by+BALL>=ry && by<=ry+PH && bvx>0){ bvx=-Math.abs(bvx)*1.05; bvy+=((by-(ry+PH/2))/PH)*5; Orbit.beep(440,0.05); }
+  if(bx<-20){ s2++; upd(); check(); serve(1); }
+  if(bx>c.width+20){ s1++; upd(); check(); serve(-1); }
+}
+function check(){ if(s1>=7||s2>=7){ over=true; } }
+function draw(){ x.fillStyle='#0e0e15';x.fillRect(0,0,c.width,c.height);
+  x.strokeStyle='#2a2a3a'; x.setLineDash([8,10]); x.beginPath(); x.moveTo(c.width/2,0); x.lineTo(c.width/2,c.height); x.stroke(); x.setLineDash([]);
+  x.fillStyle='#c4b5fd'; x.fillRect(8,ly,PW,PH); x.fillStyle='#8b5cf6'; x.fillRect(c.width-8-PW,ry,PW,PH);
+  x.fillStyle='#fff'; x.fillRect(bx,by,BALL,BALL);
+  if(over){ x.fillStyle='rgba(8,8,12,.7)'; x.fillRect(0,0,c.width,c.height); x.fillStyle='#fff'; x.font='bold 28px Inter,sans-serif'; x.textAlign='center'; x.fillText(s1>s2?'You win!':'CPU wins',c.width/2,c.height/2); x.font='15px Inter,sans-serif'; x.fillStyle='#a2a1b4'; x.fillText('Press New game',c.width/2,c.height/2+30); }
+}
+document.getElementById('new').onclick=()=>reset(true);
+reset(true);
+Orbit.loop(()=>{step();draw();});
+</script>
+</body>
+</html>
