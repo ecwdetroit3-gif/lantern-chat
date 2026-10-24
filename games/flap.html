@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Flap · Lantern</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+<link rel="stylesheet" href="shell.css">
+</head>
+<body>
+<header class="game-top">
+  <a class="icon-btn" href="../" aria-label="All games" title="All games"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M11 4 6 9l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+  <h1>Flap</h1>
+  <div class="stats">
+    <div class="stat"><span>Score</span><b id="score">0</b></div>
+    <div class="stat"><span>Best</span><b id="best">0</b></div>
+  </div>
+  <button class="icon-btn" id="fullscreen" type="button" aria-label="Full screen" title="Full screen"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 7V3h4M15 7V3h-4M3 11v4h4M15 11v4h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+</header>
+<main class="stage" id="stage"><canvas id="board" aria-label="Flap game"></canvas></main>
+<p class="help"><span class="keys"><kbd>Space</kbd>, <kbd>↑</kbd> or click to flap · <kbd>P</kbd> to pause · </span>Tap to flap on touch screens</p>
+<script src="shell.js"></script>
+<script>
+(function () {
+  const W = 400, H = 600, GROUND = 60, GAP = 156, PIPE_W = 64, SPACING = 230, SPEED = 160;
+  const GRAVITY = 1500, FLAP = -440, X = 110, R = 15;
+  const canvas = document.getElementById('board');
+  const ctx = Shell.fit(canvas, W, H, draw);
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+
+  let y, vy, pipes, score, state, last, scroll, paused;
+  bestEl.textContent = Shell.fmt(Shell.get('flap.best', 0));
+
+  function reset() {
+    y = H / 2 - 40; vy = 0; pipes = []; score = 0; scroll = 0; paused = false;
+    state = 'ready';
+    scoreEl.textContent = '0';
+    draw();
+  }
+
+  function addPipe(x) {
+    const min = 70, max = H - GROUND - GAP - 70;
+    pipes.push({ x, top: min + Math.random() * (max - min), passed: false });
+  }
+
+  function flap() {
+    if (paused || Shell.overlayOpen()) return;
+    if (state === 'over') return;
+    if (state === 'ready') {
+      state = 'play';
+      addPipe(W + 40);
+    }
+    vy = FLAP;
+  }
+
+  function step(dt) {
+    scroll = (scroll + SPEED * dt) % 24;
+    if (state === 'ready') {
+      y = H / 2 - 40 + Math.sin(performance.now() / 300) * 8;
+      return;
+    }
+    vy += GRAVITY * dt;
+    y += vy * dt;
+    if (state !== 'play') {
+      if (y > H - GROUND - R) { y = H - GROUND - R; }
+      return;
+    }
+    for (const p of pipes) p.x -= SPEED * dt;
+    if (pipes.length && pipes[0].x < -PIPE_W) pipes.shift();
+    const lastPipe = pipes[pipes.length - 1];
+    if (!lastPipe) addPipe(W + 40);
+    else if (lastPipe.x + SPACING < W + 40) addPipe(lastPipe.x + SPACING);
+
+    if (y < R) { y = R; vy = 0; }
+    if (y > H - GROUND - R) return crash();
+    for (const p of pipes) {
+      if (!p.passed && p.x + PIPE_W < X - R) {
+        p.passed = true; score++;
+        scoreEl.textContent = Shell.fmt(score);
+      }
+      // Circle against the two pipe rectangles.
+      if (X + R > p.x && X - R < p.x + PIPE_W) {
+        const cx = Math.max(p.x, Math.min(X, p.x + PIPE_W));
+        const hitTop = y - R < p.top && (X - cx) ** 2 + (y - Math.min(y, p.top)) ** 2 < R * R;
+        const hitBottom = y + R > p.top + GAP && (X - cx) ** 2 + (y - Math.max(y, p.top + GAP)) ** 2 < R * R;
+        if (hitTop || hitBottom) return crash();
+      }
+    }
+  }
+
+  function crash() {
+    state = 'over';
+    vy = Math.min(vy, 0);
+    const { best, isNew } = Shell.best('flap', score);
+    bestEl.textContent = Shell.fmt(best);
+    Shell.card('flap', 'Best ' + Shell.fmt(best));
+    setTimeout(() => Shell.overlay('Crashed', 'Score ' + Shell.fmt(score) + (isNew && score > 0 ? ' · new best' : ''),
+      [{ label: 'Play again', primary: true, onClick: () => { Shell.hideOverlay(); reset(); } }]), 450);
+  }
+
+  function loop(t) {
+    const dt = Math.min(0.033, (t - last) / 1000);
+    last = t;
+    if (!paused) step(dt);
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function pause() {
+    if (state !== 'play' || paused) return;
+    paused = true;
+    Shell.overlay('Paused', '', [{ label: 'Resume', primary: true, onClick: () => { Shell.hideOverlay(); paused = false; } }]);
+  }
+
+  function draw() {
+    if (!pipes) return;
+    const c = Shell.colors;
+    ctx.fillStyle = c.surface;
+    ctx.fillRect(0, 0, W, H);
+    for (const p of pipes) {
+      ctx.fillStyle = c.sunk;
+      ctx.fillRect(p.x, 0, PIPE_W, p.top);
+      ctx.fillRect(p.x, p.top + GAP, PIPE_W, H - GROUND - p.top - GAP);
+      ctx.fillStyle = c.line;
+      ctx.beginPath(); ctx.roundRect(p.x - 4, p.top - 18, PIPE_W + 8, 18, 4); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(p.x - 4, p.top + GAP, PIPE_W + 8, 18, 4); ctx.fill();
+    }
+    // Ground with moving stripes.
+    ctx.fillStyle = c.sunk;
+    ctx.fillRect(0, H - GROUND, W, GROUND);
+    ctx.fillStyle = c.line;
+    ctx.fillRect(0, H - GROUND, W, 3);
+    for (let x = -scroll; x < W; x += 24) ctx.fillRect(x, H - GROUND + 12, 12, 4);
+
+    // The flyer: a small lantern that tilts with its speed.
+    ctx.save();
+    ctx.translate(X, y);
+    ctx.rotate(Math.max(-0.5, Math.min(1.1, vy / 700)));
+    ctx.fillStyle = c.accent;
+    ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = c.ink;
+    ctx.beginPath(); ctx.roundRect(-7, -R - 5, 14, 6, 3); ctx.fill();
+    ctx.fillStyle = c.surface;
+    ctx.beginPath(); ctx.arc(6, -4, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = c.ink;
+    ctx.beginPath(); ctx.arc(7.5, -4, 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    ctx.textAlign = 'center';
+    if (state === 'play' || state === 'over') {
+      ctx.fillStyle = c.ink;
+      ctx.font = '700 44px "Bricolage Grotesque", sans-serif';
+      ctx.fillText(String(score), W / 2, 76);
+    } else {
+      ctx.fillStyle = c.muted;
+      ctx.font = '500 15px "IBM Plex Sans", sans-serif';
+      ctx.fillText('Tap, click or press Space to fly', W / 2, H / 2 + 40);
+    }
+  }
+
+  const stage = document.getElementById('stage');
+  stage.addEventListener('pointerdown', (e) => { if (e.target === canvas) { e.preventDefault(); flap(); } });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+      if (Shell.overlayOpen()) return;
+      e.preventDefault();
+      if (!e.repeat) flap();
+    }
+    if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+      if (paused) { Shell.hideOverlay(); paused = false; } else pause();
+    }
+  });
+  Shell.onHidden(pause);
+
+  reset();
+  last = performance.now();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

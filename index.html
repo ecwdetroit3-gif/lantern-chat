@@ -3,918 +3,162 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="robots" content="noindex,nofollow">
-<meta name="referrer" content="no-referrer">
-<meta name="description" content="A private AI chat page. Bring your own API key.">
-<title>Lantern Chat</title>
+<meta name="description" content="Browser games and a web proxy.">
+<title>Lantern</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="assets/site.css">
 <style>
-/* Layout: two-pane chat — a quiet chat list on the left, one reading column with a docked composer on the right. Amber is the only accent: it marks Claude and the send action. */
-:root {
-  --bg: #F2F3EF;
-  --surface: #FFFFFF;
-  --sunk: #E8EAE4;
-  --ink: #1B2026;
-  --muted: #5E6570;
-  --line: #D9DCD4;
-  --accent: #A85D0C;
-  --accent-soft: #F6E7D2;
-  --accent-ink: #FFFFFF;
-  --danger: #A8321F;
-  --code-bg: #EEF0EA;
-  --shadow: 0 1px 2px rgba(27,32,38,.06), 0 8px 24px rgba(27,32,38,.06);
-  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
-  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+.hero { padding: 48px 0 32px; }
+.hero h1 {
+  margin: 0; font-family: var(--f-display); font-weight: 700; font-size: clamp(34px, 6vw, 56px);
+  line-height: 1.05; letter-spacing: -.02em;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #121519; --surface: #1B1F25; --sunk: #232830; --ink: #E9E7E2; --muted: #9AA1AA;
-    --line: #2D323A; --accent: #F0A23A; --accent-soft: #3A2A14; --accent-ink: #1C1206;
-    --danger: #F08A73; --code-bg: #171B20; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
-    color-scheme: dark;
-  }
+.hero p { margin: 12px 0 24px; color: var(--muted); font-size: 17px; max-width: 560px; }
+.go {
+  display: flex; gap: 8px; max-width: 640px; padding: 6px; border-radius: 14px;
+  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow);
 }
-:root[data-theme="dark"] {
-  --bg: #121519; --surface: #1B1F25; --sunk: #232830; --ink: #E9E7E2; --muted: #9AA1AA;
-  --line: #2D323A; --accent: #F0A23A; --accent-soft: #3A2A14; --accent-ink: #1C1206;
-  --danger: #F08A73; --code-bg: #171B20; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
-  color-scheme: dark;
-}
+.go:focus-within { border-color: var(--accent); }
+.go svg { flex: none; align-self: center; margin-left: 8px; color: var(--muted); }
+.go input { flex: 1; min-width: 0; border: 0; background: none; padding: 8px 4px; font-size: 16px; outline: none; }
+.go-note { margin-top: 10px; font-size: 13px; color: var(--muted); }
 
-html, body { height: 100%; }
-body {
-  background: var(--bg); color: var(--ink);
-  font-family: var(--f-body); font-size: 15px; line-height: 1.6;
-  overflow: hidden;
+.section-head { display: flex; align-items: baseline; gap: 12px; margin: 24px 0 14px; flex-wrap: wrap; }
+.section-head h2 { margin: 0; font-family: var(--f-display); font-size: 26px; letter-spacing: -.01em; }
+.section-head .count { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.filter {
+  margin-left: auto; width: 220px; max-width: 100%; padding: 7px 12px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--surface);
 }
-button { font: inherit; color: inherit; cursor: pointer; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-.app { display: grid; grid-template-columns: 272px minmax(0, 1fr); height: 100%; }
-
-/* Sidebar */
-.side {
-  display: flex; flex-direction: column; gap: 12px; min-height: 0;
-  padding: 16px 12px; border-right: 1px solid var(--line); background: var(--bg);
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; padding-bottom: 32px; }
+.card {
+  display: flex; flex-direction: column; gap: 4px; padding: 16px; border-radius: 14px; text-decoration: none;
+  background: var(--surface); border: 1px solid var(--line); transition: border-color .15s, transform .15s;
 }
-.brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px 8px; }
-.brand svg { flex: none; }
-.brand b { font-family: var(--f-display); font-weight: 700; font-size: 20px; letter-spacing: -.01em; }
-.new-btn {
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
-  background: var(--surface); font-weight: 500;
+.card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.card .art {
+  height: 112px; margin-bottom: 10px; border-radius: 10px; background: var(--sunk);
+  display: flex; align-items: center; justify-content: center;
 }
-.new-btn:hover { border-color: var(--accent); }
-.list-label {
-  font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
-  color: var(--muted); padding: 8px 8px 0;
-}
-.chat-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; min-height: 0; flex: 1; }
-.chat-item { display: flex; align-items: center; border-radius: 8px; }
-.chat-item:hover, .chat-item.active { background: var(--sunk); }
-.chat-item .open {
-  flex: 1; min-width: 0; text-align: left; border: 0; background: none; padding: 8px 10px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px;
-}
-.chat-item.active .open { font-weight: 500; }
-.chat-item .del {
-  border: 0; background: none; color: var(--muted); padding: 6px 8px; opacity: 0; border-radius: 6px;
-}
-.chat-item:hover .del, .chat-item.active .del, .chat-item .del:focus-visible { opacity: 1; }
-.chat-item .del:hover { color: var(--danger); }
-.chat-item.confirming { background: var(--accent-soft); }
-.confirm-row { display: flex; gap: 6px; padding: 6px 8px; align-items: center; font-size: 13px; width: 100%; }
-.confirm-row span { flex: 1; }
-.confirm-row button { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 2px 8px; font-size: 12px; }
-.confirm-row .yes { color: var(--danger); }
-.empty-list { color: var(--muted); font-size: 13px; padding: 8px; }
-.storage-note { font-size: 12px; color: var(--muted); padding: 8px; border-top: 1px solid var(--line); }
-
-/* Main */
-.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--surface); }
-.top {
-  display: flex; align-items: center; gap: 12px; padding: 10px 20px;
-  border-bottom: 1px solid var(--line);
-}
-.menu-btn { display: none; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 8px; }
-.chat-title { flex: 1; min-width: 0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tiers { display: flex; padding: 3px; gap: 2px; background: var(--sunk); border-radius: 10px; }
-.tiers button {
-  border: 0; background: none; padding: 5px 12px; border-radius: 8px; font-size: 13px; color: var(--muted);
-}
-.tiers button[aria-pressed="true"] { background: var(--surface); color: var(--ink); font-weight: 500; box-shadow: var(--shadow); }
-
-.scroll { flex: 1; overflow-y: auto; min-height: 0; }
-.thread { max-width: 760px; margin: 0 auto; padding: 28px 20px 24px; display: flex; flex-direction: column; gap: 28px; }
-
-.msg { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.msg.user { align-items: flex-end; }
-.msg.user .bubble {
-  background: var(--sunk); padding: 10px 16px; border-radius: 16px 16px 4px 16px;
-  max-width: 85%; white-space: pre-wrap; overflow-wrap: anywhere;
-}
-.msg.ai .who { display: flex; align-items: center; gap: 8px; font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
-.msg.ai .who .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
-.msg.ai.streaming .who .dot { animation: pulse 1.2s ease-in-out infinite; }
-@keyframes pulse { 50% { opacity: .3; } }
-.md { min-width: 0; overflow-wrap: anywhere; }
-.md > :first-child { margin-top: 0; }
-.md > :last-child { margin-bottom: 0; }
-.md p, .md ul, .md ol, .md blockquote, .md pre, .md table { margin: 0 0 .85em; }
-.md h1, .md h2, .md h3, .md h4 { font-family: var(--f-display); font-weight: 700; line-height: 1.25; margin: 1.2em 0 .5em; text-wrap: balance; }
-.md h1 { font-size: 1.45em; } .md h2 { font-size: 1.25em; } .md h3 { font-size: 1.1em; } .md h4 { font-size: 1em; }
-.md ul, .md ol { padding-left: 1.4em; }
-.md li + li { margin-top: .25em; }
-.md a { color: var(--accent); }
-.md code { font-family: var(--f-mono); font-size: .88em; background: var(--code-bg); padding: .1em .35em; border-radius: 4px; }
-.md pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; overflow-x: auto; }
-.md pre code { background: none; padding: 0; font-size: 13px; line-height: 1.55; }
-.md blockquote { border-left: 3px solid var(--line); padding-left: 12px; color: var(--muted); }
-.md .tbl { overflow-x: auto; margin: 0 0 .85em; }
-.md table { border-collapse: collapse; font-size: 14px; margin: 0; }
-.md th, .md td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
-.md th { background: var(--sunk); font-weight: 600; }
-.md hr { border: 0; border-top: 1px solid var(--line); margin: 1.2em 0; }
-.thinking { color: var(--muted); font-style: italic; }
-.actions { display: flex; gap: 4px; }
-.actions button {
-  border: 0; background: none; color: var(--muted); font-size: 12px; padding: 4px 8px; border-radius: 6px;
-  display: inline-flex; align-items: center; gap: 5px;
-}
-.actions button:hover { background: var(--sunk); color: var(--ink); }
-.note { font-size: 13px; color: var(--danger); }
-.note.soft { color: var(--muted); }
-
-/* Empty state */
-.welcome { padding-top: 6vh; display: flex; flex-direction: column; gap: 22px; }
-.welcome h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(28px, 5vw, 40px); line-height: 1.1; letter-spacing: -.02em; margin: 0; text-wrap: balance; }
-.welcome h1 em { font-style: normal; color: var(--accent); }
-.welcome p { margin: 0; color: var(--muted); max-width: 52ch; }
-.starters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.starter {
-  text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 12px;
-  padding: 12px 14px; display: flex; flex-direction: column; gap: 2px;
-}
-.starter:hover { border-color: var(--accent); }
-.starter small { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
-.starter span { font-size: 14px; }
-
-/* Composer */
-.dock { padding: 8px 20px 16px; }
-.composer {
-  max-width: 760px; margin: 0 auto; display: flex; align-items: flex-end; gap: 8px;
-  border: 1px solid var(--line); background: var(--surface); border-radius: 16px; padding: 8px 8px 8px 16px;
-  box-shadow: var(--shadow);
-}
-.composer:focus-within { border-color: var(--accent); }
-.composer textarea {
-  flex: 1; min-width: 0; border: 0; outline: 0; resize: none; background: none; color: var(--ink);
-  font: inherit; line-height: 1.5; padding: 6px 0; max-height: 220px;
-}
-.composer textarea::placeholder { color: var(--muted); }
-.send {
-  flex: none; width: 38px; height: 38px; border-radius: 10px; border: 0;
-  background: var(--accent); color: var(--accent-ink); display: grid; place-items: center;
-}
-.send:disabled { opacity: .4; cursor: default; }
-.send.stop { background: var(--ink); color: var(--surface); }
-.hint { max-width: 760px; margin: 6px auto 0; font-size: 12px; color: var(--muted); text-align: center; }
-.hint kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
-
-.offline {
-  max-width: 760px; margin: 0 auto 8px; font-size: 13px; padding: 10px 14px; border-radius: 10px;
-  background: var(--accent-soft); color: var(--ink);
-}
-
-.scrim { display: none; }
-.lock { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: grid; place-items: center; padding: 16px; }
-.lock-card { width: min(420px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 28px 24px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 14px; }
-.lock-card h1 { font-family: var(--f-display); font-size: 26px; margin: 0; letter-spacing: -.01em; }
-.lock-card p { margin: 0; color: var(--muted); }
-.lock-card input { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-.lock-card button { border: 0; border-radius: 10px; padding: 10px 14px; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
-.lock-card .err { color: var(--danger); font-size: 13px; }
-.lock { overflow-y: auto; }
-.field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 500; }
-.field em { font-style: normal; font-weight: 400; color: var(--muted); }
-.lock-card select { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-.lock-card input:focus, .lock-card select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-.setup-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
-.lock-card button.ghost { background: none; color: var(--ink); border: 1px solid var(--line); font-weight: 500; }
-.lock-card button.ghost.danger { color: var(--danger); margin-right: auto; }
-.test-row { display: flex; gap: 8px; }
-.test-row input { flex: 1; min-width: 0; }
-.lock-card .test-row button { flex: none; padding: 10px 14px; }
-.help { font-weight: 400; color: var(--muted); font-size: 12px; line-height: 1.45; }
-.test-status { font-weight: 400; font-size: 13px; padding: 8px 10px; border-radius: 8px; background: var(--sunk); }
-.test-status.bad { color: var(--danger); }
-.link-btn { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; font-size: 12px; }
-
-@media (max-width: 760px) {
-  .app { grid-template-columns: minmax(0, 1fr); }
-  .side {
-    position: fixed; inset: 0 auto 0 0; width: min(300px, 84vw); z-index: 20;
-    padding-top: calc(16px + env(safe-area-inset-top, 0px)); padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-    background: var(--surface); transform: translateX(-100%); transition: transform .2s ease;
-  }
-  .app.nav-open .side { transform: none; box-shadow: var(--shadow); }
-  .app.nav-open .scrim { display: block; position: fixed; inset: 0; z-index: 10; background: rgba(0,0,0,.35); border: 0; }
-  .menu-btn { display: inline-flex; }
-  .top { padding: 10px 16px; }
-  .thread { padding: 20px 16px; }
-  .dock { padding: 8px 16px 12px; }
-  .starters { grid-template-columns: minmax(0, 1fr); }
-  .tiers button { padding: 5px 9px; }
-  .hint { display: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .side { transition: none; }
-  .msg.ai.streaming .who .dot { animation: none; }
+.card h3 { margin: 0; font-family: var(--f-display); font-size: 19px; letter-spacing: -.01em; }
+.card p { margin: 0; font-size: 14px; color: var(--muted); }
+.card .meta { margin-top: auto; padding-top: 10px; font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.card .meta b { color: var(--accent); font-weight: 500; }
+.empty { color: var(--muted); padding: 24px 0 48px; }
+footer { border-top: 1px solid var(--line); padding: 20px 0 32px; font-size: 13px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .card { transition: none; } .card:hover { transform: none; } }
+@media (max-width: 560px) {
+  .hero { padding: 32px 0 24px; }
+  .filter { margin-left: 0; width: 100%; }
 }
 </style>
-<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0} [hidden]{display:none!important} *{box-sizing:border-box}</style>
 </head>
 <body>
-<div class="app" id="app">
-  <aside class="side" aria-label="Chats">
-    <div class="brand">
-      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
-        <rect x="9" y="1.5" width="8" height="3" rx="1.5" fill="var(--ink)"/>
-        <path d="M6 7.5h14l-1.6 14.5a2 2 0 0 1-2 1.8H9.6a2 2 0 0 1-2-1.8L6 7.5z" fill="none" stroke="var(--ink)" stroke-width="2"/>
-        <circle cx="13" cy="15" r="3.6" fill="var(--accent)"/>
-      </svg>
-      <b>Lantern</b>
-    </div>
-    <button class="new-btn" id="newChat" type="button">
-      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      New chat
-    </button>
-    <div class="list-label">Recent</div>
-    <ul class="chat-list" id="chatList"></ul>
-    <div class="storage-note"><span id="storageNote">Not connected yet.</span> <button type="button" class="link-btn" id="openSettings">AI settings</button></div>
-  </aside>
-  <button class="scrim" id="scrim" type="button" aria-label="Close chat list"></button>
+<header class="site-top">
+  <a class="brand" href="./">
+    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+      <rect x="9" y="1.5" width="8" height="3" rx="1.5" fill="var(--ink)"/>
+      <path d="M6 7.5h14l-1.6 14.5a2 2 0 0 1-2 1.8H9.6a2 2 0 0 1-2-1.8L6 7.5z" fill="none" stroke="var(--ink)" stroke-width="2"/>
+      <circle cx="13" cy="15" r="3.6" fill="var(--accent)"/>
+    </svg>
+    <b>Lantern</b>
+  </a>
+  <nav class="nav" aria-label="Site">
+    <a href="./" aria-current="page">Games</a>
+    <a href="proxy.html">Proxy</a>
+  </nav>
+</header>
 
-  <main class="main">
-    <header class="top">
-      <button class="menu-btn" id="menuBtn" type="button" aria-label="Open chat list">
-        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 5h12M3 9h12M3 13h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      </button>
-      <div class="chat-title" id="chatTitle">New chat</div>
-      <div class="tiers" role="group" aria-label="Response style">
-        <button type="button" data-tier="quick" aria-pressed="false" title="Fastest replies">Quick</button>
-        <button type="button" data-tier="default" aria-pressed="true" title="Balanced speed and depth">Balanced</button>
-        <button type="button" data-tier="complex" aria-pressed="false" title="Thinks longest, for hard problems">Deep</button>
-      </div>
-    </header>
+<main class="wrap">
+  <section class="hero">
+    <h1>Play something.</h1>
+    <p>Eight games that run right in your browser, plus a proxy for getting to the rest of the web.</p>
+    <form class="go" id="go" action="proxy.html" method="get">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m12.2 12.2 3.8 3.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <input name="q" type="text" placeholder="Search the web or type an address" aria-label="Search or address" autocomplete="off" spellcheck="false" enterkeyhint="go">
+      <button class="btn primary" type="submit">Go</button>
+    </form>
+    <div class="go-note">Opens in the proxy.</div>
+  </section>
 
-    <div class="scroll" id="scroll">
-      <div class="thread" id="thread"></div>
-    </div>
+  <div class="section-head">
+    <h2>Games</h2>
+    <span class="count" id="count"></span>
+    <input class="filter" id="filter" type="search" placeholder="Filter games" aria-label="Filter games">
+  </div>
+  <div class="grid" id="grid"></div>
+  <p class="empty" id="empty" hidden>No games match that.</p>
+</main>
 
-    <div class="dock">
-      <div class="offline" id="offline" hidden></div>
-      <form class="composer" id="composer">
-        <textarea id="input" aria-label="Message" rows="1" placeholder="Send a message…" autocomplete="off"></textarea>
-        <button class="send" id="sendBtn" type="submit" aria-label="Send" disabled>
-          <svg id="sendIcon" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 14V4M4.5 8.5 9 4l4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-      </form>
-      <div class="hint"><kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line · Replies use your own API key</div>
-    </div>
-  </main>
-</div>
+<footer>
+  <div class="wrap">Scores and progress are saved in this browser only.</div>
+</footer>
 
-<div class="lock" id="lock" hidden>
-  <form class="lock-card" id="setupForm" autocomplete="off">
-    <h1>Connect your AI</h1>
-    <p>Paste an API key from any AI company, or connect to an AI running on your own computer or server. Lantern saves your settings in this browser only.</p>
-    <label class="field"><span id="keyLabel">API key</span>
-      <input id="setKey" type="password" placeholder="sk-ant-…, AIza…, sk-…, gsk_…" spellcheck="false">
-    </label>
-    <label class="field"><span>AI company</span>
-      <select id="setProvider">
-        <option value="auto">Detect from my key</option>
-        <option value="gemini">Google Gemini</option>
-        <option value="anthropic">Anthropic (Claude)</option>
-        <option value="openai">OpenAI (GPT)</option>
-        <option value="groq">Groq</option>
-        <option value="openrouter">OpenRouter</option>
-        <option value="custom">My own server or another service</option>
-      </select>
-    </label>
-    <div class="field" id="baseField" hidden>
-      <label for="setBase">API address</label>
-      <div class="test-row">
-        <input id="setBase" type="text" inputmode="url" autocapitalize="off" placeholder="192.168.1.5 or https://my-pc.example/v1" spellcheck="false">
-        <button type="button" class="ghost" id="setTest">Test</button>
-      </div>
-      <small class="help">Type your server's IP address, like 192.168.1.5, or a full address. Lantern fills in the rest (Ollama's port 11434 and /v1). Local IP addresses work in Chrome and Edge, which will ask you to allow access to your local network.</small>
-      <div class="test-status" id="testStatus" hidden></div>
-    </div>
-    <label class="field"><span>Model <em id="modelHint">optional</em></span>
-      <input id="setModel" type="text" list="modelList" placeholder="Leave blank for the defaults" spellcheck="false">
-      <datalist id="modelList"></datalist>
-    </label>
-    <div class="err" id="setErr" hidden></div>
-    <div class="setup-actions">
-      <button type="button" class="ghost danger" id="setForget" hidden>Remove settings</button>
-      <button type="button" class="ghost" id="setCancel" hidden>Cancel</button>
-      <button type="submit">Save and start</button>
-    </div>
-  </form>
-</div>
 <script>
-(() => {
-  const STARTERS = [
-    { tag: "Explain", text: "Explain how video games save your progress, step by step." },
-    { tag: "Write", text: "Write a short, funny birthday message for my best friend." },
-    { tag: "Plan", text: "Help me make a study plan for a big test in two weeks." },
-    { tag: "Brainstorm", text: "Give me 10 cool name ideas for a gaming YouTube channel." }
+(function () {
+  const S = 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"';
+  const A = 'fill="var(--accent)"', I = 'fill="var(--ink)"', L = 'fill="var(--line)"';
+  const GAMES = [
+    { id: 'snake', name: 'Snake', text: 'Eat, grow longer, and don’t bite your own tail.', tags: 'arcade classic',
+      art: `<rect x="6" y="22" width="9" height="9" rx="2.5" ${A}/><rect x="16" y="22" width="9" height="9" rx="2.5" ${A}/><rect x="26" y="22" width="9" height="9" rx="2.5" ${A}/><rect x="26" y="12" width="9" height="9" rx="2.5" ${A}/><rect x="36" y="12" width="9" height="9" rx="2.5" ${I}/><circle cx="60" cy="16.5" r="4" fill="var(--danger)"/>` },
+    { id: '2048', name: '2048', text: 'Slide the tiles. Merge matching numbers until you reach 2048.', tags: 'puzzle numbers',
+      art: `<rect x="14" y="4" width="18" height="18" rx="3" fill="color-mix(in srgb, var(--accent) 25%, var(--surface))"/><rect x="34" y="4" width="18" height="18" rx="3" fill="color-mix(in srgb, var(--accent) 55%, var(--surface))"/><rect x="14" y="24" width="18" height="18" rx="3" ${A}/><rect x="34" y="24" width="18" height="18" rx="3" ${I}/>` },
+    { id: 'blocks', name: 'Blocks', text: 'Falling pieces, full rows, rising speed.', tags: 'puzzle arcade tetris',
+      art: `<rect x="12" y="10" width="10" height="10" rx="2" fill="#9A6BC9"/><rect x="22" y="10" width="10" height="10" rx="2" fill="#9A6BC9"/><rect x="32" y="10" width="10" height="10" rx="2" fill="#9A6BC9"/><rect x="22" y="20" width="10" height="10" rx="2" fill="#9A6BC9"/><rect x="12" y="34" width="10" height="10" rx="2" fill="#3BA5C4"/><rect x="22" y="34" width="10" height="10" rx="2" fill="#3BA5C4"/><rect x="32" y="34" width="10" height="10" rx="2" fill="#D9A92E"/><rect x="42" y="34" width="10" height="10" rx="2" fill="#D9A92E"/><rect x="42" y="24" width="10" height="10" rx="2" fill="#D9A92E"/>` },
+    { id: 'minesweeper', name: 'Minesweeper', text: 'Use the numbers to find every mine without setting one off.', tags: 'puzzle logic',
+      art: `<path d="M22 40V8" ${S}/><path d="M22 9h16l-4 6 4 6H22z" ${A}/><circle cx="48" cy="32" r="7" ${I}/><path d="M48 21v22M37 32h22M40.5 24.5l15 15M55.5 24.5l-15 15" ${S}/>` },
+    { id: 'breakout', name: 'Breakout', text: 'Bounce the ball and break every brick.', tags: 'arcade classic',
+      art: `<rect x="6" y="6" width="16" height="6" rx="2" ${A}/><rect x="24" y="6" width="16" height="6" rx="2" ${A}/><rect x="42" y="6" width="16" height="6" rx="2" ${A}/><rect x="15" y="14" width="16" height="6" rx="2" fill="color-mix(in srgb, var(--accent) 55%, var(--surface))"/><rect x="33" y="14" width="16" height="6" rx="2" fill="color-mix(in srgb, var(--accent) 55%, var(--surface))"/><circle cx="38" cy="32" r="3.5" ${A}/><rect x="22" y="41" width="22" height="4" rx="2" ${I}/>` },
+    { id: 'flap', name: 'Flap', text: 'Tap to fly through the gaps. One touch and it’s over.', tags: 'arcade one-button',
+      art: `<rect x="40" y="0" width="12" height="16" ${L}/><rect x="40" y="32" width="12" height="16" ${L}/><circle cx="22" cy="24" r="7" ${A}/><rect x="18.5" y="14.5" width="7" height="3" rx="1.5" ${I}/><circle cx="25" cy="22" r="1.6" ${I}/>` },
+    { id: 'pong', name: 'Pong', text: 'Table tennis against the computer. First to seven.', tags: 'arcade classic sports',
+      art: `<rect x="8" y="10" width="4" height="16" rx="2" ${A}/><rect x="52" y="22" width="4" height="16" rx="2" ${I}/><circle cx="34" cy="20" r="3.5" ${I}/><path d="M32 4v4M32 14v4M32 24v4M32 34v4M32 44v2" stroke="var(--line)" stroke-width="2"/>` },
+    { id: 'connect4', name: 'Connect Four', text: 'Drop discs and line up four. Play the computer or a friend.', tags: 'strategy two-player board',
+      art: `<rect x="12" y="6" width="40" height="36" rx="5" fill="var(--surface)"/>${[0, 1, 2, 3].map((c) => [0, 1, 2].map((r) => `<circle cx="${19 + c * 9}" cy="${14 + r * 10}" r="3.6" fill="${(r === 2 && c < 3) || (r === 1 && c === 1) ? 'var(--accent)' : (r === 2 && c === 3) || (r === 1 && c === 2) ? 'var(--ink)' : 'var(--sunk)'}"/>`).join('')).join('')}` },
   ];
 
-  const $ = (id) => document.getElementById(id);
-  const app = $("app"), thread = $("thread"), scroll = $("scroll"), input = $("input"),
-        sendBtn = $("sendBtn"), chatList = $("chatList"), chatTitle = $("chatTitle"),
-        lock = $("lock"), setupForm = $("setupForm"), setErr = $("setErr");
-
-  const state = {
-    chats: new Map(), currentId: null, tier: "default",
-    streaming: null, confirmDelete: null, lastError: null, cfg: null, aiName: "AI"
-  };
-
-  // ---------- AI companies ----------
-  const SYSTEM = [
-    "You are a helpful AI assistant inside a personal chat website called Lantern.",
-    "Be warm, direct and genuinely helpful. Use Markdown when formatting helps (lists, headings, tables, fenced code blocks with a language tag); keep casual replies short.",
-    "You cannot browse the web, see files, or remember anything outside this conversation. If asked for live information, say so plainly and help with what you know."
-  ].join("\n");
-
-  // Default models for Quick / Balanced / Deep. A model typed in settings replaces all three.
-  const PROVIDERS = {
-    anthropic: { name: "Claude", label: "Anthropic", base: "https://api.anthropic.com/v1",
-      models: { quick: "claude-haiku-5-5", default: "claude-sonnet-5-5", complex: "claude-opus-5-5" } },
-    openai: { name: "GPT", label: "OpenAI", base: "https://api.openai.com/v1",
-      models: { quick: "gpt-5.6-luna", default: "gpt-5.6-terra", complex: "gpt-5.6-sol" } },
-    gemini: { name: "Gemini", label: "Google Gemini", base: "https://generativelanguage.googleapis.com/v1beta",
-      models: { quick: "gemini-3.1-flash-lite", default: "gemini-3.5-flash", complex: "gemini-3.1-pro-preview" } },
-    groq: { name: "AI", label: "Groq", base: "https://api.groq.com/openai/v1",
-      models: { quick: "llama-3.1-8b-instant", default: "llama-3.3-70b-versatile", complex: "llama-3.3-70b-versatile" } },
-    openrouter: { name: "AI", label: "OpenRouter", base: "https://openrouter.ai/api/v1",
-      models: { quick: "openrouter/auto", default: "openrouter/auto", complex: "openrouter/auto" } },
-    custom: { name: "AI", label: "your AI service", base: "", models: { quick: null, default: null, complex: null } }
-  };
-
-  function detect(key) {
-    if (key.startsWith("sk-ant-")) return "anthropic";
-    if (key.startsWith("AIza")) return "gemini";
-    if (key.startsWith("sk-or-")) return "openrouter";
-    if (key.startsWith("gsk_")) return "groq";
-    if (key.startsWith("sk-")) return "openai";
-    return null;
+  function saved(id) {
+    try { return JSON.parse(localStorage.getItem('lantern.games.' + id + '.card')); } catch { return null; }
   }
 
-  // Turns saved settings into a ready-to-use connection, or an error message.
-  function buildCfg(saved) {
-    if (!saved) return { error: "Paste an API key to get started." };
-    const id = saved.provider === "auto" || !saved.provider ? detect(saved.key || "") : saved.provider;
-    if (!saved.key && id !== "custom") return { error: "Paste an API key to get started." };
-    if (!id) return { error: "Lantern couldn't tell which company this key is from. Choose it under AI company." };
-    const p = PROVIDERS[id];
-    const base = id === "custom" ? normalizeBase(saved.base) : p.base.replace(/\/+$/, "");
-    if (id === "custom" && !/^https?:\/\//.test(base)) return { error: "Enter your server's address, like 192.168.1.5." };
-    if (id === "custom") { const why = blockedReason(base); if (why) return { error: why }; }
-    const m = (saved.model || "").trim();
-    const models = { quick: m || p.models.quick, default: m || p.models.default, complex: m || p.models.complex };
-    if (!models.default) return { error: "Enter the model name to use for this service." };
-    return { id, key: saved.key || "", base, models, name: p.name, label: p.label };
+  const grid = document.getElementById('grid');
+  for (const g of GAMES) {
+    const a = document.createElement('a');
+    a.className = 'card';
+    a.href = 'games/' + g.id + '.html';
+    a.dataset.search = (g.name + ' ' + g.tags).toLowerCase();
+    const note = saved(g.id);
+    a.innerHTML = `<div class="art"><svg width="128" height="96" viewBox="0 0 64 48" aria-hidden="true">${g.art}</svg></div>
+      <h3></h3><p></p><div class="meta">${note ? '<b></b>' : 'Not played yet'}</div>`;
+    a.querySelector('h3').textContent = g.name;
+    a.querySelector('p').textContent = g.text;
+    if (note) a.querySelector('.meta b').textContent = note;
+    grid.appendChild(a);
   }
 
-  // ---------- server addresses ----------
-  // Is this host on the local network (this computer, home network, Tailscale, .local)?
-  function isLocalHost(host) {
-    host = host.replace(/^\[|\]$/g, "").toLowerCase();
-    if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return true;
-    const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-    if (m) {
-      const [x, y] = [+m[1], +m[2]];
-      return x === 10 || x === 127 || (x === 172 && y >= 16 && y <= 31) || (x === 192 && y === 168) ||
-             (x === 169 && y === 254) || (x === 100 && y >= 64 && y <= 127);
+  const count = document.getElementById('count');
+  const empty = document.getElementById('empty');
+  const filter = document.getElementById('filter');
+  function applyFilter() {
+    const q = filter.value.trim().toLowerCase();
+    let shown = 0;
+    for (const card of grid.children) {
+      const match = !q || card.dataset.search.includes(q);
+      card.hidden = !match;
+      if (match) shown++;
     }
-    return host === "::1" || /^f[cd][0-9a-f]{2}:/.test(host) || /^fe80:/.test(host);
+    count.textContent = q ? shown + ' of ' + GAMES.length : GAMES.length + ' games';
+    empty.hidden = shown > 0;
   }
-  const isIPv4 = (h) => /^\d{1,3}(\.\d{1,3}){3}$/.test(h);
+  filter.addEventListener('input', applyFilter);
+  applyFilter();
 
-  // Turns "192.168.1.5" into "http://192.168.1.5:11434/v1", and tidies full addresses.
-  function normalizeBase(input) {
-    let t = (input || "").trim().replace(/\/+$/, "");
-    if (!t) return "";
-    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) {
-      const host = t.split(/[\/:]/)[0];
-      t = (isLocalHost(host) || isIPv4(host) ? "http://" : "https://") + t;
-    }
-    let u; try { u = new URL(t); } catch (e) { return t; }
-    if (u.protocol === "http:" && !u.port && (isIPv4(u.hostname) || isLocalHost(u.hostname))) u.port = "11434";
-    if (u.pathname === "/" || u.pathname === "") u.pathname = "/v1";
-    return u.toString().replace(/\/+$/, "");
-  }
-
-  // Extra fetch option so Chrome treats requests to local IPs as local-network requests.
-  function netOpts(base) {
-    try { const u = new URL(base); return u.protocol === "http:" && isLocalHost(u.hostname) ? { targetAddressSpace: "local" } : {}; }
-    catch (e) { return {}; }
-  }
-  function isLocalHttp(base) { return !!netOpts(base).targetAddressSpace; }
-
-  // Only one case can never work from this https website: plain http to a public internet address.
-  function blockedReason(base) {
-    let u; try { u = new URL(base); } catch (e) { return "That address doesn't look right. Try something like 192.168.1.5."; }
-    if (location.protocol === "https:" && u.protocol === "http:" && !isLocalHost(u.hostname)) {
-      return "Browsers block this website from using http:// addresses on the public internet. Use your PC's local IP address (like 192.168.1.5) on the same Wi-Fi, or an https:// address from Tailscale.";
-    }
-    return null;
-  }
-  function connectHelp(base) {
-    return isLocalHttp(base) && location.protocol === "https:"
-      ? "Couldn't connect. Check that: Ollama is running with OLLAMA_HOST set to 0.0.0.0 and OLLAMA_ORIGINS set to this website; Windows Firewall allows port 11434; and you chose Allow if your browser asked about your local network. Local IP addresses only work in Chrome and Edge (not Safari, Firefox, or iPhone browsers)."
-      : "Couldn't connect. Check that the server is running, the address is right, and the server allows this website (for Ollama, set OLLAMA_ORIGINS).";
-  }
-  function authHeaders(key) { return key ? { authorization: "Bearer " + key } : {}; }
-
-  async function testConnection() {
-    const st = $("testStatus");
-    const base = normalizeBase($("setBase").value);
-    if (base) $("setBase").value = base;
-    const key = $("setKey").value.trim();
-    st.hidden = false; st.className = "test-status"; st.textContent = "Connecting…";
-    const bad = (msg) => { st.className = "test-status bad"; st.textContent = msg; };
-    if (!/^https?:\/\//.test(base)) return bad("Enter your server's address first, like 192.168.1.5.");
-    const why = blockedReason(base); if (why) return bad(why);
-    const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 10000);
-    try {
-      const res = await fetch(base + "/models", { headers: authHeaders(key), signal: ctl.signal, ...netOpts(base) });
-      if (res.status === 401 || res.status === 403) return bad("The server is reachable but refused the key. Check the API key.");
-      if (!res.ok) return bad("The server answered with error " + res.status + ". Check that the address ends in /v1.");
-      const j = await res.json().catch(() => ({}));
-      const ids = (Array.isArray(j.data) ? j.data : []).map(m => m && m.id).filter(Boolean);
-      const list = $("modelList"); list.innerHTML = "";
-      ids.forEach(id => { const o = document.createElement("option"); o.value = id; list.appendChild(o); });
-      if (ids.length && !$("setModel").value.trim()) $("setModel").value = ids[0];
-      st.textContent = ids.length ? "Connected. Found " + ids.length + " model" + (ids.length === 1 ? "" : "s") + ": " + ids.slice(0, 6).join(", ") + (ids.length > 6 ? "…" : "") : "Connected, but the server didn't list any models. Type the model name below.";
-    } catch (e) {
-      bad(e && e.name === "AbortError" ? "No answer after 10 seconds. Check that the PC is on, the server is running, and the address is right." : connectHelp(base));
-    } finally { clearTimeout(timer); }
-  }
-
-  function syncSetupFields() {
-    const custom = $("setProvider").value === "custom";
-    $("baseField").hidden = !custom;
-    $("keyLabel").innerHTML = custom ? 'API key <em>optional</em>' : 'API key';
-    $("modelHint").textContent = custom ? "required" : "optional";
-    $("setModel").placeholder = custom ? "For example llama3.2" : "Leave blank for the defaults";
-  }
-
-  function loadSaved() { try { return JSON.parse(localStorage.getItem("lantern.ai") || "null"); } catch (e) { return null; } }
-  function applyCfg(cfg) {
-    state.cfg = cfg; state.aiName = cfg.name;
-    document.querySelectorAll(".who-name").forEach(n => { n.textContent = cfg.name; });
-    input.placeholder = "Message " + cfg.name + "…";
-    $("storageNote").textContent = "Connected to " + cfg.label + ". Chats are saved in this browser only.";
-    setSendMode();
-  }
-
-  function openSettings(message) {
-    const saved = loadSaved() || {};
-    $("setKey").value = saved.key || "";
-    $("setProvider").value = saved.provider || "auto";
-    $("setBase").value = saved.base || "";
-    $("setModel").value = saved.model || "";
-    syncSetupFields(); $("testStatus").hidden = true;
-    $("setCancel").hidden = !state.cfg;
-    $("setForget").hidden = !(saved.key || saved.base);
-    setErr.hidden = !message; setErr.textContent = message || "";
-    lock.hidden = false; closeNav();
-    $("setKey").focus();
-  }
-  $("setProvider").addEventListener("change", syncSetupFields);
-  $("setTest").onclick = testConnection;
-  $("setBase").addEventListener("blur", () => { const v = normalizeBase($("setBase").value); if (v) $("setBase").value = v; });
-  $("setCancel").onclick = () => { lock.hidden = true; input.focus(); };
-  $("setForget").onclick = () => {
-    try { localStorage.removeItem("lantern.ai"); } catch (e) {}
-    $("setBase").value = ""; $("setModel").value = "";
-    state.cfg = null; $("storageNote").textContent = "Not connected yet.";
-    openSettings("Your settings were removed from this browser.");
-    $("setForget").hidden = true; $("setCancel").hidden = true;
-  };
-  $("openSettings").onclick = () => openSettings();
-  setupForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const saved = { key: $("setKey").value.trim(), provider: $("setProvider").value, base: normalizeBase($("setBase").value), model: $("setModel").value.trim() };
-    if (saved.base) $("setBase").value = saved.base;
-    const cfg = buildCfg(saved);
-    if (cfg.error) { setErr.textContent = cfg.error; setErr.hidden = false; return; }
-    try { localStorage.setItem("lantern.ai", JSON.stringify(saved)); } catch (e2) {}
-    applyCfg(cfg);
-    lock.hidden = true; input.focus();
+  document.getElementById('go').addEventListener('submit', (e) => {
+    if (!e.target.q.value.trim()) e.preventDefault();
   });
-
-  // One request per company, straight from the browser.
-  function callAI(cfg, model, messages, signal) {
-    if (cfg.id === "anthropic") {
-      return fetch(cfg.base + "/messages", {
-        method: "POST", signal,
-        headers: { "content-type": "application/json", "x-api-key": cfg.key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-        body: JSON.stringify({ model, max_tokens: 8192, system: SYSTEM, messages, stream: true })
-      });
-    }
-    if (cfg.id === "gemini") {
-      return fetch(cfg.base + "/models/" + encodeURIComponent(model) + ":streamGenerateContent?alt=sse", {
-        method: "POST", signal,
-        headers: { "content-type": "application/json", "x-goog-api-key": cfg.key },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM }] },
-          contents: messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }))
-        })
-      });
-    }
-    const headers = { "content-type": "application/json", ...authHeaders(cfg.key) };
-    if (cfg.id === "openrouter") headers["x-title"] = "Lantern";
-    return fetch(cfg.base + "/chat/completions", {
-      method: "POST", signal, headers, ...netOpts(cfg.base),
-      body: JSON.stringify({ model, stream: true, messages: [{ role: "system", content: SYSTEM }, ...messages] })
-    });
-  }
-
-  // Pull the text out of one streamed event, in each company's format.
-  function readEvent(cfg, ev) {
-    if (cfg.id === "anthropic") {
-      if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta") return { text: ev.delta.text };
-      if (ev.type === "message_delta" && ev.delta && ev.delta.stop_reason === "max_tokens") return { truncated: true };
-      if (ev.type === "error") return { error: ev.error && ev.error.type === "overloaded_error" ? "The AI is busy right now. Try again in a moment." : "The reply stopped early. Try again." };
-      return null;
-    }
-    if (cfg.id === "gemini") {
-      const c = ev.candidates && ev.candidates[0];
-      if (!c) return ev.error ? { error: ev.error.message || "The reply stopped early. Try again." } : null;
-      const text = ((c.content && c.content.parts) || []).map(p => (p.thought ? "" : p.text || "")).join("");
-      const out = {};
-      if (text) out.text = text;
-      if (c.finishReason === "MAX_TOKENS") out.truncated = true;
-      if (c.finishReason === "SAFETY" || c.finishReason === "PROHIBITED_CONTENT") out.error = "The AI wouldn't answer that one. Try asking a different way.";
-      return Object.keys(out).length ? out : null;
-    }
-    if (ev.error) return { error: ev.error.message || "The reply stopped early. Try again." };
-    const ch = ev.choices && ev.choices[0];
-    if (!ch) return null;
-    const out = {};
-    if (ch.delta && typeof ch.delta.content === "string" && ch.delta.content) out.text = ch.delta.content;
-    if (ch.finish_reason === "length") out.truncated = true;
-    return Object.keys(out).length ? out : null;
-  }
-
-  async function errorFor(cfg, res, model) {
-    let detail = "";
-    try {
-      const j = await res.json();
-      const e = Array.isArray(j) ? j[0] && j[0].error : j.error;
-      detail = (e && (e.message || (typeof e === "string" ? e : ""))) || "";
-    } catch (e) {}
-    const s = res.status;
-    const err = new Error();
-    if (s === 401 || (s === 403 && /key|auth|permission/i.test(detail)) || (s === 400 && /api key/i.test(detail))) { err.badKey = true; err.message = "Your " + cfg.label + " API key was rejected. Check it in AI settings."; }
-    else if (s === 402) err.message = "Your " + cfg.label + " account is out of credit.";
-    else if (s === 404 || (s === 400 && /model/i.test(detail))) err.message = 'The model "' + model + '" isn\'t available on your account. Enter a different model in AI settings.';
-    else if (s === 429) err.message = "Too many messages too fast, or you've hit your plan's limit. Wait a bit and try again.";
-    else if (s >= 500) err.message = "The AI is busy or having problems right now. Try again in a moment.";
-    else err.message = ("The AI returned an error. " + detail).trim();
-    return err;
-  }
-
-  // ---------- helpers ----------
-  const uidGen = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  const titleFrom = (t) => { const s = t.replace(/\s+/g, " ").trim(); return s.length > 48 ? s.slice(0, 46) + "…" : s || "New chat"; };
-  const current = () => state.chats.get(state.currentId) || null;
-  const bytes = (s) => new Blob([s]).size;
-
-  function renderMd(text) {
-    try {
-      if (window.marked && window.DOMPurify) {
-        const html = DOMPurify.sanitize(marked.parse(text, { gfm: true, breaks: false }));
-        const tmp = document.createElement("div");
-        tmp.innerHTML = html;
-        tmp.querySelectorAll("a").forEach(a => { a.target = "_blank"; a.rel = "noopener noreferrer"; });
-        tmp.querySelectorAll("table").forEach(t => { const w = document.createElement("div"); w.className = "tbl"; t.replaceWith(w); w.appendChild(t); });
-        return tmp.innerHTML;
-      }
-    } catch (e) {}
-    const d = document.createElement("div"); d.textContent = text; d.style.whiteSpace = "pre-wrap";
-    return d.outerHTML;
-  }
-  function nearBottom() { return scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 120; }
-  function toBottom() { scroll.scrollTop = scroll.scrollHeight; }
-
-  // ---------- rendering ----------
-  function renderList() {
-    const chats = [...state.chats.values()].filter(c => c.messages.length).sort((a, b) => b.updatedAt - a.updatedAt);
-    chatList.innerHTML = "";
-    if (!chats.length) {
-      const li = document.createElement("li"); li.className = "empty-list";
-      li.textContent = "Your chats will show up here.";
-      chatList.appendChild(li); return;
-    }
-    for (const c of chats) {
-      const li = document.createElement("li");
-      li.className = "chat-item" + (c.id === state.currentId ? " active" : "");
-      if (state.confirmDelete === c.id) {
-        li.classList.add("confirming");
-        const row = document.createElement("div"); row.className = "confirm-row";
-        const s = document.createElement("span"); s.textContent = "Delete this chat?";
-        const yes = document.createElement("button"); yes.type = "button"; yes.className = "yes"; yes.textContent = "Delete";
-        yes.onclick = () => deleteChat(c.id);
-        const no = document.createElement("button"); no.type = "button"; no.textContent = "Keep";
-        no.onclick = () => { state.confirmDelete = null; renderList(); };
-        row.append(s, yes, no); li.appendChild(row);
-      } else {
-        const open = document.createElement("button"); open.type = "button"; open.className = "open";
-        open.textContent = c.title; open.title = c.title;
-        open.onclick = () => openChat(c.id);
-        const del = document.createElement("button"); del.type = "button"; del.className = "del";
-        del.setAttribute("aria-label", "Delete " + c.title);
-        del.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 4h8M5.5 4V2.8h3V4M4 4l.6 7.2h4.8L10 4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        del.onclick = () => { state.confirmDelete = c.id; renderList(); };
-        li.append(open, del);
-      }
-      chatList.appendChild(li);
-    }
-  }
-
-  function renderWelcome() {
-    const w = document.createElement("section"); w.className = "welcome";
-    const h = document.createElement("h1"); h.innerHTML = "What are we <em>working on</em> today?";
-    const p = document.createElement("p");
-    p.textContent = "Ask anything: homework, code, game ideas, writing, or just talk it through. Pick Quick for fast answers or Deep for hard problems.";
-    const g = document.createElement("div"); g.className = "starters";
-    for (const s of STARTERS) {
-      const b = document.createElement("button"); b.type = "button"; b.className = "starter";
-      const sm = document.createElement("small"); sm.textContent = s.tag;
-      const sp = document.createElement("span"); sp.textContent = s.text;
-      b.append(sm, sp);
-      b.onclick = () => { input.value = s.text; autosize(); send(); };
-      g.appendChild(b);
-    }
-    w.append(h, p, g);
-    return w;
-  }
-
-  function aiNode(text, opts = {}) {
-    const m = document.createElement("div"); m.className = "msg ai" + (opts.streaming ? " streaming" : "");
-    const who = document.createElement("div"); who.className = "who";
-    who.innerHTML = '<span class="dot"></span><span class="who-name"></span>';
-    who.querySelector(".who-name").textContent = state.aiName;
-    const body = document.createElement("div"); body.className = "md";
-    body.innerHTML = text ? renderMd(text) : '<p class="thinking">Thinking…</p>';
-    m.append(who, body);
-    if (opts.actions) {
-      const a = document.createElement("div"); a.className = "actions";
-      const copy = document.createElement("button"); copy.type = "button";
-      copy.innerHTML = '<svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M2 8.5V3a1 1 0 0 1 1-1h5.5" fill="none" stroke="currentColor" stroke-width="1.3"/></svg><span>Copy</span>';
-      copy.onclick = async () => {
-        const label = copy.querySelector("span");
-        try { await navigator.clipboard.writeText(text); label.textContent = "Copied"; }
-        catch (e) { const r = document.createRange(); r.selectNodeContents(body); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); label.textContent = "Selected — press Ctrl+C"; }
-        setTimeout(() => { label.textContent = "Copy"; }, 1800);
-      };
-      a.appendChild(copy);
-      if (opts.regen) {
-        const re = document.createElement("button"); re.type = "button";
-        re.innerHTML = '<svg width="13" height="13" viewBox="0 0 13 13" aria-hidden="true"><path d="M10.5 6.5a4 4 0 1 1-1.2-2.85M10.5 2v2.5H8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Try again</span>';
-        re.onclick = regenerate;
-        a.appendChild(re);
-      }
-      m.appendChild(a);
-    }
-    return m;
-  }
-
-  function renderThread() {
-    const c = current();
-    thread.innerHTML = "";
-    chatTitle.textContent = c && c.messages.length ? c.title : "New chat";
-    if (!c || !c.messages.length) { thread.appendChild(renderWelcome()); return; }
-    const streamingHere = state.streaming && state.streaming.chatId === c.id;
-    c.messages.forEach((msg, i) => {
-      if (msg.role === "user") {
-        const m = document.createElement("div"); m.className = "msg user";
-        const b = document.createElement("div"); b.className = "bubble"; b.textContent = msg.content;
-        m.appendChild(b); thread.appendChild(m);
-      } else {
-        const isLast = i === c.messages.length - 1;
-        const node = aiNode(msg.content, { actions: true, regen: isLast && !streamingHere });
-        if (msg.interrupted) { const n = document.createElement("div"); n.className = "note soft"; n.textContent = "Reply was cut off."; node.appendChild(n); }
-        thread.appendChild(node);
-      }
-    });
-    const last = c.messages[c.messages.length - 1];
-    if (!streamingHere && last.role === "user" && state.lastError && state.lastError.chatId === c.id) {
-      const m = document.createElement("div"); m.className = "msg ai";
-      const n = document.createElement("div"); n.className = "note"; n.textContent = state.lastError.message;
-      const a = document.createElement("div"); a.className = "actions";
-      const re = document.createElement("button"); re.type = "button"; re.innerHTML = "<span>Try again</span>";
-      re.onclick = () => { state.lastError = null; runReply(c.id); };
-      a.appendChild(re); m.append(n, a);
-      thread.appendChild(m);
-    }
-  }
-
-  function setSendMode() {
-    const busy = !!state.streaming;
-    sendBtn.classList.toggle("stop", busy);
-    sendBtn.setAttribute("aria-label", busy ? "Stop" : "Send");
-    sendBtn.innerHTML = busy
-      ? '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="2" width="10" height="10" rx="2" fill="currentColor"/></svg>'
-      : '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 14V4M4.5 8.5 9 4l4.5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    sendBtn.disabled = busy ? false : !input.value.trim();
-  }
-  function autosize() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 220) + "px"; setSendMode(); }
-
-  // ---------- storage (this browser) ----------
-  function saveLocal() {
-    try {
-      let arr = [...state.chats.values()].filter(c => c.messages.length)
-        .sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 50)
-        .map(c => ({ id: c.id, title: c.title, updatedAt: c.updatedAt, messages: c.messages }));
-      while (arr.length > 1 && bytes(JSON.stringify(arr)) > 4000000) arr.pop();
-      localStorage.setItem("lantern.chats", JSON.stringify(arr));
-    } catch (e) {}
-  }
-  function loadLocal() {
-    try {
-      const arr = JSON.parse(localStorage.getItem("lantern.chats") || "[]");
-      for (const c of arr) if (c && c.id && Array.isArray(c.messages)) state.chats.set(c.id, c);
-    } catch (e) {}
-  }
-  function deleteChat(id) {
-    state.confirmDelete = null;
-    if (state.streaming && state.streaming.chatId === id) state.streaming.ctl.abort();
-    state.chats.delete(id);
-    if (state.currentId === id) newChat();
-    renderList(); saveLocal();
-  }
-
-  // ---------- chat actions ----------
-  function newChat() {
-    if (state.streaming) return;
-    const c = { id: uidGen(), title: "New chat", updatedAt: Date.now(), messages: [] };
-    state.chats.set(c.id, c); state.currentId = c.id; state.lastError = null;
-    renderList(); renderThread(); closeNav();
-  }
-  function openChat(id) {
-    const prev = current(); if (prev && !prev.messages.length && prev.id !== id) state.chats.delete(prev.id);
-    state.currentId = id; state.confirmDelete = null; state.lastError = null;
-    renderList(); renderThread(); closeNav(); toBottom();
-  }
-  function send() {
-    const text = input.value.trim();
-    if (!text || state.streaming) return;
-    if (!state.cfg) { openSettings(); return; }
-    let c = current(); if (!c) { newChat(); c = current(); }
-    if (!c.messages.length) c.title = titleFrom(text);
-    c.messages.push({ role: "user", content: text });
-    c.updatedAt = Date.now();
-    input.value = ""; autosize();
-    state.lastError = null;
-    renderList(); renderThread(); toBottom(); saveLocal();
-    runReply(c.id);
-  }
-  function regenerate() {
-    const c = current(); if (!c || state.streaming) return;
-    if (c.messages.length && c.messages[c.messages.length - 1].role === "assistant") c.messages.pop();
-    renderThread(); runReply(c.id);
-  }
-  function buildTurns(messages) {
-    let turns = messages.map(m => ({ role: m.role, content: m.content })).filter(m => m.content);
-    while (turns.length > 1 && bytes(JSON.stringify(turns)) > 150000) {
-      turns = turns.slice(1);
-      while (turns.length && turns[0].role !== "user") turns = turns.slice(1);
-    }
-    return turns;
-  }
-
-  async function streamReply(turns, signal, onText) {
-    const cfg = state.cfg;
-    let model = cfg.models[state.tier] || cfg.models.default;
-    let res;
-    try { res = await callAI(cfg, model, turns, signal); }
-    catch (e) {
-      if (e && e.name === "AbortError") throw e;
-      throw new Error(cfg.id === "custom" ? connectHelp(cfg.base) : "Couldn't reach " + cfg.label + ". Check your internet connection and try again.");
-    }
-    // If the chosen model isn't available (say, a paid model on a free plan), use the Balanced one.
-    if (!res.ok && model !== cfg.models.default && [400, 403, 404, 429].includes(res.status)) {
-      model = cfg.models.default;
-      res = await callAI(cfg, model, turns, signal);
-    }
-    if (!res.ok) throw await errorFor(cfg, res, model);
-
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "", text = "", truncated = false;
-    const handle = (block) => {
-      const data = block.split("\n").filter(l => l.startsWith("data:")).map(l => l.slice(5).trim()).join("");
-      if (!data || data === "[DONE]") return;
-      let ev; try { ev = JSON.parse(data); } catch (e) { return; }
-      const out = readEvent(cfg, ev);
-      if (!out) return;
-      if (out.text) { text += out.text; onText(text); }
-      if (out.truncated) truncated = true;
-      if (out.error) { const err = new Error(out.error); err.partial = text; throw err; }
-    };
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true }).replace(/\r\n/g, "\n");
-      let i;
-      while ((i = buf.indexOf("\n\n")) >= 0) { const block = buf.slice(0, i); buf = buf.slice(i + 2); handle(block); }
-    }
-    handle(buf);
-    if (!text.trim()) throw new Error("The AI didn't write anything back. Try rephrasing.");
-    return { text, truncated };
-  }
-
-  async function runReply(chatId) {
-    const c = state.chats.get(chatId); if (!c) return;
-    const ctl = new AbortController();
-    state.streaming = { chatId, ctl };
-    setSendMode(); renderThread();
-    let node = null, body = null, latest = "";
-    const mount = () => {
-      if (state.currentId !== chatId) return null;
-      if (!node || !node.isConnected) { node = aiNode("", { streaming: true }); thread.appendChild(node); body = node.querySelector(".md"); }
-      return body;
-    };
-    mount(); toBottom();
-    try {
-      const res = await streamReply(buildTurns(c.messages), ctl.signal, (text) => {
-        latest = text;
-        const stick = nearBottom();
-        const b = mount(); if (b) { b.innerHTML = renderMd(text); if (stick) toBottom(); }
-      });
-      c.messages.push({ role: "assistant", content: res.text, interrupted: res.truncated });
-    } catch (e) {
-      const cancelled = e && e.name === "AbortError";
-      const partial = (e && e.partial) || latest;
-      if (partial) c.messages.push({ role: "assistant", content: partial, interrupted: !cancelled });
-      if (e && e.badKey) openSettings(e.message);
-      if (!cancelled && !partial) state.lastError = { chatId, message: (e && e.message) || "Something went wrong. Try again." };
-    } finally {
-      state.streaming = null;
-      c.updatedAt = Date.now();
-      setSendMode(); renderList();
-      if (state.currentId === chatId) { const stick = nearBottom(); renderThread(); if (stick) toBottom(); }
-      saveLocal();
-    }
-  }
-
-  // ---------- nav / events ----------
-  function closeNav() { app.classList.remove("nav-open"); }
-  $("menuBtn").onclick = () => app.classList.add("nav-open");
-  $("scrim").onclick = closeNav;
-  $("newChat").onclick = () => { newChat(); input.focus(); };
-
-  document.querySelectorAll(".tiers button").forEach(b => {
-    b.onclick = () => {
-      state.tier = b.dataset.tier;
-      document.querySelectorAll(".tiers button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
-      try { localStorage.setItem("lantern.tier", state.tier); } catch (e) {}
-    };
-  });
-  try {
-    const t = localStorage.getItem("lantern.tier");
-    if (t) { const b = document.querySelector('.tiers button[data-tier="' + t + '"]'); if (b) b.click(); }
-  } catch (e) {}
-
-  $("composer").addEventListener("submit", (e) => {
-    e.preventDefault();
-    if (state.streaming) state.streaming.ctl.abort(); else send();
-  });
-  input.addEventListener("input", autosize);
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!state.streaming) send(); }
-  });
-
-  // ---------- boot ----------
-  loadLocal();
-  newChat();
-  setSendMode();
-  const startCfg = buildCfg(loadSaved());
-  if (startCfg.error) openSettings(); else { applyCfg(startCfg); input.focus(); }
 })();
 </script>
 </body>
